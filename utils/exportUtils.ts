@@ -145,7 +145,9 @@ export const exportToWord = async (scheme: SchemeBook) => {
     sections: [{ 
       properties: { 
         page: { 
-          orientation: PageOrientation.LANDSCAPE,
+          size: {
+            orientation: PageOrientation.LANDSCAPE,
+          },
           margin: { top: 400, right: 400, bottom: 400, left: 400 }
         } 
       }, 

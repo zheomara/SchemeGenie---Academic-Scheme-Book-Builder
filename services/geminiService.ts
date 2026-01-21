@@ -36,7 +36,8 @@ export const extractSyllabusInfo = async (
   });
 
   try {
-    return JSON.parse(response.text.trim());
+    const text = response.text ?? "";
+    return JSON.parse(text.trim());
   } catch (error) {
     return { subject: "", form: "", recommendedWeeksPerTerm: 12 };
   }
@@ -111,7 +112,8 @@ export const generateLessonChunk = async (
   });
 
   try {
-    const result = JSON.parse(response.text.trim());
+    const text = response.text ?? "";
+    const result = JSON.parse(text.trim());
     if (!Array.isArray(result)) throw new Error("Output is not an array");
     return result;
   } catch (error) {
@@ -152,5 +154,6 @@ export const generateLessonResourcesContent = async (
       }
     }
   });
-  return JSON.parse(response.text.trim());
+  const text = response.text ?? "";
+  return JSON.parse(text.trim());
 };
