@@ -46,9 +46,9 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ customMessage }) => {
         
         <div className="mt-8 pt-8 border-t border-slate-100 w-full">
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-loose">
-            Generating 18 chunks of 12 lessons each.<br/>
-            This multi-stage process ensures high quality and no truncation.<br/>
-            Estimated completion: 1-2 minutes.
+            Generating 9 optimized chunks of 24 lessons each.<br/>
+            This reduces API calls and manages quota limits automatically.<br/>
+            If you see "Retrying...", please wait—it's managing the rate limits for you.
           </p>
         </div>
       </div>

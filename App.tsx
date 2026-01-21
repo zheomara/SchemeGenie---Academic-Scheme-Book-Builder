@@ -37,9 +37,8 @@ const App: React.FC = () => {
     const allLessons: Lesson[] = [];
     
     try {
-      const CHUNK_SIZE = 12;
+      const CHUNK_SIZE = 24; // Increased from 12 to 24 to reduce API call count
       const LESSONS_PER_TERM = 72;
-      const TOTAL_LESSONS = 216;
 
       for (let termNum = 1; termNum <= 3; termNum++) {
         for (let lessonStart = 1; lessonStart <= LESSONS_PER_TERM; lessonStart += CHUNK_SIZE) {
@@ -83,7 +82,7 @@ const App: React.FC = () => {
         createdAt: Date.now()
       });
     } catch (err: any) {
-      setError(err.message || "The generation process was interrupted. Please check your internet and try again.");
+      setError(err.message || "The generation process was interrupted. Please check your internet or try again in a few minutes.");
     } finally {
       setIsLoading(false);
       setLoadingStep('');
@@ -100,7 +99,7 @@ const App: React.FC = () => {
         lessons: prev.lessons.map(l => l.id === lesson.id ? { ...l, ...resources, isGeneratingResources: false } : l)
       } : null);
     } catch (err) {
-      alert("Failed to build detailed bundle.");
+      alert("Failed to build detailed bundle. You might have hit the daily API quota.");
       updateLesson(lesson.id, 'isGeneratingResources', false);
     }
   };
@@ -156,11 +155,19 @@ const App: React.FC = () => {
             <div className="text-center space-y-4 py-10">
               <h2 className="text-4xl md:text-6xl font-extrabold text-slate-800 tracking-tight leading-none">Complete Year <br/><span className="text-indigo-600">Deep-Syllabus Mapping</span></h2>
               <p className="text-base md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed">
-                Generating 216 lessons in 18 high-precision batches. Each lesson is detailed with specific resources and evaluation criteria.
+                Generating 216 lessons optimized for API efficiency. Each lesson is detailed with specific resources and evaluation criteria.
               </p>
             </div>
             <InputForm onGenerate={handleGenerate} />
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl flex items-center gap-3 mt-4"><Layout className="w-5 h-5" />{error}</div>}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl flex flex-col gap-2 mt-4">
+                <div className="flex items-center gap-3">
+                  <Layout className="w-5 h-5" />
+                  <span className="font-bold">Generation Error</span>
+                </div>
+                <p className="text-sm opacity-80">{error}</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-8">
