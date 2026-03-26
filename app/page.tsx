@@ -1,18 +1,19 @@
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { Download, Layout, RotateCcw, Printer, PlusCircle, Sparkles, FolderArchive, Package, Info, GraduationCap, FileText, FileDown, FileCheck, X, FileSpreadsheet } from 'lucide-react';
-import InputForm from './components/InputForm';
-import SchemeTable from './components/SchemeTable';
-import LoadingOverlay from './components/LoadingOverlay';
-import Login from './components/Login';
-import { SchemeBook, SchemeMetadata, Lesson } from './types';
-import { generateLessonChunk, generateLessonResourcesContent } from './services/geminiService';
-import { exportToPDF, exportToExcel, exportToWord, downloadFullPackageZip, exportRecordBookExcel } from './utils/exportUtils';
+import InputForm from '@/components/InputForm';
+import SchemeTable from '@/components/SchemeTable';
+import LoadingOverlay from '@/components/LoadingOverlay';
+import Login from '@/components/Login';
+import { SchemeBook, SchemeMetadata, Lesson } from '@/types';
+import { generateLessonChunk, generateLessonResourcesContent } from '@/services/geminiService';
+import { exportToPDF, exportToExcel, exportToWord, downloadFullPackageZip, exportRecordBookExcel } from '@/utils/exportUtils';
 
 const STORAGE_KEY = 'schemegenie_v10_chunked';
 const AUTH_KEY = 'schemegenie_auth_v1';
 
-const App: React.FC = () => {
+export default function Home() {
   const [activeScheme, setActiveScheme] = useState<SchemeBook | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>('');
@@ -248,6 +249,4 @@ const App: React.FC = () => {
       {isLoading && <LoadingOverlay customMessage={loadingStep} />}
     </div>
   );
-};
-
-export default App;
+}

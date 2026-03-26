@@ -1,4 +1,6 @@
 
+"use client";
+
 import React, { useState } from 'react';
 import { Lesson, SchemeMetadata } from '../types';
 import { PackageOpen, Loader2, ChevronRight, Hash, CalendarDays, BookOpen, Video, ExternalLink } from 'lucide-react';

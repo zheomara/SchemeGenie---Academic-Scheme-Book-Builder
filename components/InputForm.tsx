@@ -1,4 +1,6 @@
 
+"use client";
+
 import React, { useState, useRef } from 'react';
 import { SchemeMetadata } from '../types';
 import { getAcademicYears } from '../utils/dateUtils';

@@ -1,4 +1,6 @@
 
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { LOADING_MESSAGES } from '../constants';
 import { Loader2, Sparkles } from 'lucide-react';

@@ -6,7 +6,9 @@ export default defineConfig({
   plugins: [react()],
   define: {
     // Vite replaces this string everywhere in your code with the actual key value
-    'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || '')
+    'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || ''),
+    'process.env.OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || ''),
+    'global': 'globalThis',
   },
   build: {
     outDir: 'dist',
