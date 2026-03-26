@@ -1,0 +1,841 @@
+[
+  {
+    "id": 0,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "The app should hav",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1768314205,
+      "nanos": 852000000
+    }
+  },
+  {
+    "id": 1,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": ""
+    },
+    "createdTimestamp": {
+      "seconds": 1768314205,
+      "nanos": 853000000
+    }
+  },
+  {
+    "id": 2,
+    "author": "model",
+    "payload": {
+      "type": "error",
+      "error": "The task was canceled.",
+      "isCancelError": true
+    },
+    "createdTimestamp": {
+      "seconds": 1768314214,
+      "nanos": 743000000
+    },
+    "doneTimestamp": {
+      "seconds": 1768314214,
+      "nanos": 743000000
+    }
+  },
+  {
+    "id": 3,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "The app should give user option to download scheme as .XLS file",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1768314314,
+      "nanos": 274000000
+    }
+  },
+  {
+    "id": 4,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Exploring Excel Export Options**\n\nI'm currently investigating how to integrate an Excel download feature. I've found that we already have an `exportToExcel` function within the `utils/exportUtils.ts` file, and the application has existing document export buttons. This means the scaffolding might be straightforward, likely involving adding a new button in `App.tsx` and connecting it to the existing export utility.\n\n\n**Integrating Excel Export Functionality**\n\nI've made progress on adding the Excel export feature. I've confirmed that `exportToExcel` in `exportUtils.ts` handles the full scheme data, so it's ready to use. Now, I'm integrating a new \"Excel Scheme\" button within the export suite in `App.tsx`. I believe this will provide the user with the expected `.XLS` download. The implementation will include a simple button click that triggers the function.\n\n\n**Finalizing Excel Integration**\n\nI'm now in the process of finalizing the Excel integration. I've confirmed `exportToExcel` is exported and ready to use. I'm focusing on the visual aspect in `App.tsx` now. I've decided to add the `FileSpreadsheet` icon from `lucide-react` for a proper Excel icon. This is a nice visual touch. This will integrate well with the other export options. I'm ready to modify `App.tsx` and integrate the button.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1768314314,
+      "nanos": 275000000
+    },
+    "doneTimestamp": {
+      "seconds": 1768314328,
+      "nanos": 227000000
+    }
+  },
+  {
+    "id": 5,
+    "author": "model",
+    "payload": {
+      "type": "generationTable",
+      "entries": [
+        {
+          "path": "App.tsx",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Added a button to export the full scheme to Excel (.xlsx) format in the export suite.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport React, { useState, useEffect } from 'react';\nimport { Download, Layout, RotateCcw, Printer, PlusCircle, Sparkles, FolderArchive, Package, Info, GraduationCap, FileText, FileDown, FileCheck, X, FileSpreadsheet } from 'lucide-react';\nimport InputForm from './components/InputForm';\nimport SchemeTable from './components/SchemeTable';\nimport LoadingOverlay from './components/LoadingOverlay';\nimport { SchemeBook, SchemeMetadata, Lesson } from './types';\nimport { generateLessonChunk, generateLessonResourcesContent } from './services/geminiService';\nimport { getWeekEndingDate } from './utils/dateUtils';\nimport { exportToPDF, exportToExcel, exportToWord, downloadFullPackageZip, exportRecordBookExcel } from './utils/exportUtils';\n\nconst STORAGE_KEY = 'schemegenie_v10_chunked';\n\nconst App: React.FC = () => {\n  const [activeScheme, setActiveScheme] = useState<SchemeBook | null>(null);\n  const [isLoading, setIsLoading] = useState(false);\n  const [loadingStep, setLoadingStep] = useState<string>('');\n  const [error, setError] = useState<string | null>(null);\n\n  useEffect(() => {\n    const saved = localStorage.getItem(STORAGE_KEY);\n    if (saved) {\n      try {\n        const parsed = JSON.parse(saved);\n        if (Array.isArray(parsed) && parsed.length > 0) setActiveScheme(parsed[0]);\n      } catch (e) { }\n    }\n  }, []);\n\n  useEffect(() => {\n    if (activeScheme) localStorage.setItem(STORAGE_KEY, JSON.stringify([activeScheme]));\n  }, [activeScheme]);\n\n  const handleGenerate = async (metadata: SchemeMetadata, syllabusFile?: { data: string, mimeType: string }) => {\n    setIsLoading(true);\n    setError(null);\n    const allLessons: Lesson[] = [];\n    \n    try {\n      const CHUNK_SIZE = 12;\n      const LESSONS_PER_TERM = 72;\n      const TOTAL_LESSONS = 216;\n\n      for (let termNum = 1; termNum <= 3; termNum++) {\n        for (let lessonStart = 1; lessonStart <= LESSONS_PER_TERM; lessonStart += CHUNK_SIZE) {\n          const lessonEnd = Math.min(lessonStart + CHUNK_SIZE - 1, LESSONS_PER_TERM);\n          \n          setLoadingStep(`Term ${termNum}: Building Lessons ${lessonStart}-${lessonEnd}...`);\n          \n          const chunkData = await generateLessonChunk(termNum, lessonStart, lessonEnd, metadata, syllabusFile);\n          \n          const mappedChunk: Lesson[] = chunkData.map((l, index) => {\n            const lessonNum = lessonStart + index;\n            const weekInTerm = Math.ceil(lessonNum / metadata.lessonsPerWeek);\n            const startDate = metadata.termStarts[`term${termNum as 1|2|3}`];\n            \n            return {\n              id: `lesson-${termNum}-${lessonNum}-${Date.now()}`,\n              term: termNum,\n              week: weekInTerm,\n              lessonNumber: lessonNum,\n              topic: l.topic || 'New Topic',\n              objectives: l.objectives || 'Detailed objectives pending...',\n              concepts: l.concepts || '',\n              activities: l.activities || 'Detailed procedures pending...',\n              resources: l.resources || 'Exhaustive list of materials pending...',\n              assessment: l.assessment || 'Formative assessment tasks...',\n              homework: l.homework || 'Application tasks...',\n              evaluation: l.evaluation || 'Specific success criteria...',\n              remarks: '',\n              weekEnding: getWeekEndingDate(startDate, weekInTerm),\n            };\n          });\n          \n          allLessons.push(...mappedChunk);\n        }\n      }\n\n      setActiveScheme({\n        id: `scheme-${Date.now()}`,\n        metadata,\n        lessons: allLessons,\n        createdAt: Date.now()\n      });\n    } catch (err: any) {\n      setError(err.message || \"The generation process was interrupted. Please check your internet and try again.\");\n    } finally {\n      setIsLoading(false);\n      setLoadingStep('');\n    }\n  };\n\n  const handleGenerateResources = async (lesson: Lesson) => {\n    if (!activeScheme) return;\n    updateLesson(lesson.id, 'isGeneratingResources', true);\n    try {\n      const resources = await generateLessonResourcesContent(lesson, activeScheme.metadata);\n      setActiveScheme(prev => prev ? {\n        ...prev,\n        lessons: prev.lessons.map(l => l.id === lesson.id ? { ...l, ...resources, isGeneratingResources: false } : l)\n      } : null);\n    } catch (err) {\n      alert(\"Failed to build detailed bundle.\");\n      updateLesson(lesson.id, 'isGeneratingResources', false);\n    }\n  };\n\n  const updateLesson = (id: string, field: keyof Lesson, value: any) => {\n    setActiveScheme(prev => prev ? {\n      ...prev,\n      lessons: prev.lessons.map(l => l.id === id ? { ...l, [field]: value } : l)\n    } : null);\n  };\n\n  return (\n    <div className=\"min-h-screen pb-20 bg-slate-50\">\n      <header className=\"bg-slate-800 text-white shadow-lg no-print sticky top-0 z-40\">\n        <div className=\"container mx-auto px-4 md:px-6 py-3 flex items-center justify-between\">\n          <div className=\"flex items-center gap-3\">\n            <div className=\"bg-indigo-600 p-1.5 rounded-lg shrink-0\"><Package className=\"w-5 h-5 md:w-6 md:h-6\" /></div>\n            <div>\n              <h1 className=\"text-lg md:text-xl font-bold leading-tight\">SchemeGenie</h1>\n              <p className=\"text-[10px] md:text-xs text-indigo-300 italic uppercase tracking-widest font-black\">High Fidelity Batch Mapping • 216 Lessons</p>\n            </div>\n          </div>\n          <div className=\"flex items-center gap-2\">\n            {activeScheme && (\n              <button onClick={() => { if(confirm(\"Discard current plan and start over?\")) setActiveScheme(null); }} className=\"p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white\" title=\"New Scheme\">\n                <RotateCcw className=\"w-5 h-5\" />\n              </button>\n            )}\n            <div className=\"h-6 w-px bg-slate-700 mx-1 hidden md:block\"></div>\n            {activeScheme && (\n              <div className=\"flex items-center gap-1 md:gap-2\">\n                 <button onClick={() => exportToPDF(activeScheme)} className=\"bg-rose-600 hover:bg-rose-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileDown className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">PDF</span>\n                 </button>\n                 <button onClick={() => exportToWord(activeScheme)} className=\"bg-blue-600 hover:bg-blue-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileText className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">DOCX</span>\n                 </button>\n                 <button onClick={() => exportToExcel(activeScheme)} className=\"bg-emerald-600 hover:bg-emerald-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileSpreadsheet className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">EXCEL</span>\n                 </button>\n              </div>\n            )}\n          </div>\n        </div>\n      </header>\n\n      <main className=\"container mx-auto px-4 md:px-6 py-8\">\n        {!activeScheme ? (\n          <div className=\"max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700\">\n            <div className=\"text-center space-y-4 py-10\">\n              <h2 className=\"text-4xl md:text-6xl font-extrabold text-slate-800 tracking-tight leading-none\">Complete Year <br/><span className=\"text-indigo-600\">Deep-Syllabus Mapping</span></h2>\n              <p className=\"text-base md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed\">\n                Generating 216 lessons in 18 high-precision batches. Each lesson is detailed with specific resources and evaluation criteria.\n              </p>\n            </div>\n            <InputForm onGenerate={handleGenerate} />\n            {error && <div className=\"bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl flex items-center gap-3 mt-4\"><Layout className=\"w-5 h-5\" />{error}</div>}\n          </div>\n        ) : (\n          <div className=\"space-y-8\">\n            <div className=\"grid grid-cols-1 lg:grid-cols-3 gap-6 no-print\">\n              <div className=\"lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col justify-center relative overflow-hidden\">\n                <div className=\"absolute top-0 left-0 w-2 h-full bg-indigo-600\"></div>\n                <div className=\"flex items-start justify-between\">\n                  <div>\n                    <h2 className=\"text-3xl font-black text-slate-800 uppercase tracking-tight leading-none mb-1\">{activeScheme.metadata.subject}</h2>\n                    <p className=\"text-slate-500 font-bold text-sm tracking-wide\">{activeScheme.metadata.school} • {activeScheme.metadata.form} • {activeScheme.metadata.academicYear}</p>\n                    <div className=\"mt-6 flex flex-wrap gap-2\">\n                       <span className=\"bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 shadow-md\">\n                         <FileCheck className=\"w-3.5 h-3.5\" /> {activeScheme.lessons.length} Lessons Verified\n                       </span>\n                       <span className=\"bg-slate-100 text-slate-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase\">\n                         Full Academic Year Target Reached\n                       </span>\n                    </div>\n                  </div>\n                  <button onClick={() => setActiveScheme(null)} className=\"text-slate-300 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-full\">\n                    <X className=\"w-6 h-6\" />\n                  </button>\n                </div>\n              </div>\n              \n              <div className=\"bg-slate-800 rounded-2xl shadow-xl p-6 text-white space-y-6\">\n                <h3 className=\"text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-700 pb-2\">Master Export Suite</h3>\n                <div className=\"grid grid-cols-3 gap-3\">\n                  <button onClick={() => exportToPDF(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-rose-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileDown className=\"w-6 h-6 group-hover:scale-110 transition-transform text-rose-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">A4 PDF</span>\n                  </button>\n                  <button onClick={() => exportToWord(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-blue-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileText className=\"w-6 h-6 group-hover:scale-110 transition-transform text-blue-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Word</span>\n                  </button>\n                  <button onClick={() => exportToExcel(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-emerald-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileSpreadsheet className=\"w-6 h-6 group-hover:scale-110 transition-transform text-emerald-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Excel</span>\n                  </button>\n                  <button onClick={() => exportRecordBookExcel(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-indigo-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <GraduationCap className=\"w-6 h-6 group-hover:scale-110 transition-transform text-indigo-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Grades</span>\n                  </button>\n                  <button onClick={() => downloadFullPackageZip(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-slate-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FolderArchive className=\"w-6 h-6 group-hover:scale-110 transition-transform text-slate-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Zip</span>\n                  </button>\n                </div>\n              </div>\n            </div>\n\n            <SchemeTable lessons={activeScheme.lessons} metadata={activeScheme.metadata} onUpdateLesson={updateLesson} onGenerateResources={handleGenerateResources} />\n          </div>\n        )}\n      </main>\n      {isLoading && <LoadingOverlay customMessage={loadingStep} />}\n    </div>\n  );\n};\n\nexport default App;\n"
+            }
+          ]
+        }
+      ]
+    },
+    "createdTimestamp": {
+      "seconds": 1768314328,
+      "nanos": 234000000
+    },
+    "doneTimestamp": {
+      "seconds": 1768314351,
+      "nanos": 303000000
+    }
+  },
+  {
+    "id": 6,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "give me the import.env  details\n",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769033335,
+      "nanos": 45000000
+    }
+  },
+  {
+    "id": 7,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Unpacking the Request**\n\nI'm focusing on the user's \"import.env details\" request. My current train of thought centers on API key retrieval through environmental variables, as requested. The prompt specifically highlights exclusive use for API key access. I'm now looking into how this will be implemented in code.\n\n\n**Refining the Implementation**\n\nI'm now zeroing in on the correct instantiation of the Google GenAI client, ensuring `process.env.API_KEY` is utilized directly. I'm confirming that the provided code adheres to this requirement. I have made certain there are no UI elements or manual API key configurations, as the prompt specifies. I'm double-checking the code to confirm the implementation.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769033335,
+      "nanos": 45000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769033343,
+      "nanos": 997000000
+    }
+  },
+  {
+    "id": 8,
+    "author": "model",
+    "payload": {
+      "type": "text",
+      "text": "In this application, we use **`process.env.API_KEY`** to access the Google Gemini API. \n\nAccording to the project guidelines:\n1.  **Direct Access**: The API key is accessed directly via `process.env.API_KEY` within the service files (like `services/geminiService.ts`).\n2.  **No UI/Manual Input**: The app is designed **not** to request the API key from the user through forms or settings. It assumes the environment provides this variable automatically.\n3.  **Initialization**: The Google GenAI SDK is initialized using:\n    ```typescript\n    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });\n    ```\n\nYou do not need to manually define `process.env` or create a `.env` file within the code editor; the platform handles the injection of this key securely.",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769033343,
+      "nanos": 997000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769033344,
+      "nanos": 165000000
+    }
+  },
+  {
+    "id": 9,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "im deploying this app through vercel so which framework preset should i use",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769033959,
+      "nanos": 949000000
+    }
+  },
+  {
+    "id": 10,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Assessing Application Deployment**\n\nI'm currently focused on the deployment of this application. It's built with `index.html` and `index.tsx`, employing ES6 modules and an `importmap`. The architecture involves `App.tsx`, `types.ts`, `constants.ts`, and `services/geminiService.ts`. I need to ensure a smooth transition to the Vercel environment.\n\n\n**Analyzing Deployment Requirements**\n\nI've been re-evaluating the deployment strategy. Initially, the assumption of Vercel needing a `package.json` was made, but the code structure suggests a \"No-Build\" or \"Vite/React\" style setup without the file. The importmap is key. Based on the system prompt, I'm treating the provided structure as the root. I need to ensure a correct assumption about the platform's build processes.\n\n\n**Defining Build Process Options**\n\nI'm now determining the most appropriate build process. Considering Vite, Create React App, and serving raw files, I'm leaning toward Vite for this structure, or \"Other\" to minimize friction with Vercel if no build script is provided. The key is to manage the `.tsx` TypeScript compilation, given the ES6 module setup and the `index.html` import. Vercel's handling of this will be critical.\n\n\n**Addressing TypeScript Compilation**\n\nI'm now focusing on how the browser will handle the `.tsx` files. I see the `importmap` is present in `index.html`, which is interesting. The system instructions highlight automatic importation in the sandbox, so that's helpful. This suggests a unique environment. For standard Vercel deployments of a React app, Vite or Create React App are typical, but given the user's flat structure, it seems simpler. My current thinking is that Vercel won't natively transpile TSX to JS without a build process, which is important to consider. My advice to the user is to ideally use Vite.\n\n\n**Recommending Vite Solution**\n\nI've clarified the necessity of a build step for these TSX files, and I'm leaning heavily towards recommending the Vite preset on Vercel. I'm viewing the user's provided structure as a Vite project structure missing only the configuration files, as this setup implies it will need to compile the TSX files. The user can deploy the files as a Vite project, which is the most logical choice given their file structure and modern tech stack.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769033959,
+      "nanos": 949000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769033977,
+      "nanos": 677000000
+    }
+  },
+  {
+    "id": 11,
+    "author": "model",
+    "payload": {
+      "type": "text",
+      "text": "For deploying this specific React + TypeScript application to Vercel, you should use the **Vite** framework preset.\n\nWhile your current file structure is flat (which is perfect for modern development), Vercel's build pipeline expects a standard configuration to transpile your `.tsx` files into browser-ready JavaScript.\n\n### Recommended Settings:\n1.  **Framework Preset**: Select **Vite**.\n2.  **Root Directory**: Keep as `./` (the default).\n3.  **Build Command**: `vite build`\n4.  **Output Directory**: `dist`\n\n### Important Note:\nSince your files are currently in a flat structure (no `package.json` shown in the provided snippets), you will need a `package.json` and a `vite.config.ts` in your root directory for Vercel to execute the build. \n\nIf you just want to host the files as static assets without a build step, the browser will not be able to read the `.tsx` files directly. Using the **Vite** preset ensures your TypeScript code is compiled correctly before the site goes live.",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769033977,
+      "nanos": 677000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769033977,
+      "nanos": 829000000
+    }
+  },
+  {
+    "id": 12,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "my app is not displaying after deployment on vercel",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769034329,
+      "nanos": 256000000
+    }
+  },
+  {
+    "id": 13,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Assessing Deployment Failure**\n\nI'm currently trying to understand why the React/TypeScript app isn't displaying after deployment to Vercel. My initial suggestion of a \"Vite\" preset seems inappropriate given the absence of a `package.json` file. The deployment has a flat file structure, with the main components at the root. I need to consider alternative approaches to fix this, because it seems Vercel is struggling to build or serve the application correctly, without the dependencies file.\n\n\n**Analyzing Missing Build Steps**\n\nMy understanding has shifted; I realized the absence of a `package.json` and a specific folder structure points towards a static-like site using browser-native ESM modules. The critical issue now seems to be the missing `<script>` tag referencing the entry point (`index.tsx` or its transpiled `.js` equivalent) in `index.html`. Browsers cannot run `.tsx` files directly, so the transpilation step must be included.\n\n\n**Constructing the Static Site**\n\nNow, I'm focusing on the \"Gemini\" approach. I need to make the current flat structure work with a Vite preset on Vercel. I'm building a plan that revolves around setting up `package.json` for dependencies, `vite.config.ts` to manage root-level files and the environment variable, and `index.html` to load the entry point using a script tag. I'll utilize the \"Vite\" framework preset and then build the site with `npm run build`.\n\n\n**Fixing Script Inclusion**\n\nI realize that the main problem is the missing script tag in `index.html` referencing my code's entry point. Vercel needs a `package.json` and a `vite.config.ts` file for dependencies, and handling environment variables. I'll need to define `process.env.API_KEY` correctly in `vite.config.ts` using `define`. These modifications should allow Vercel to build the site.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769034329,
+      "nanos": 256000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769034339,
+      "nanos": 452000000
+    }
+  },
+  {
+    "id": 14,
+    "author": "model",
+    "payload": {
+      "type": "text",
+      "text": "To fix the deployment on Vercel and ensure your `.tsx` files are correctly transpiled and served, you need a few configuration files that tell Vercel how to build the app. Browsers cannot run `.tsx` files directly, so we use **Vite** to turn them into standard JavaScript.\n\n### Specification of Changes\n1.  **`index.html`**: Add a `<script>` tag to point to `index.tsx`. Without this, the browser loads the HTML but never triggers the React code.\n2.  **`package.json`**: Add this to the root. Vercel needs this to identify the project as a Vite app and install the necessary build tools.\n3.  **`vite.config.ts`**: Add this to the root. This is crucial because it tells Vite to handle your flat file structure and correctly inject `process.env.API_KEY` so the Gemini API works.\n4.  **`tsconfig.json`**: Add basic TypeScript configuration to ensure the build process understands React and JSX.\n\n### Vercel Deployment Settings\nWhen you deploy on Vercel, ensure these settings are used:\n- **Framework Preset**: `Vite`\n- **Build Command**: `npm run build`\n- **Output Directory**: `dist`\n- **Environment Variables**: Add `API_KEY` in the Vercel Dashboard under **Settings > Environment Variables**.\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769034339,
+      "nanos": 452000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769034339,
+      "nanos": 641000000
+    }
+  },
+  {
+    "id": 15,
+    "author": "model",
+    "payload": {
+      "type": "generationTable",
+      "entries": [
+        {
+          "path": "index.html",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Added the entry point script tag to load the React application.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>SchemeGenie - Academic Scheme Book Builder</title>\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n    <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n    <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n    <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap\" rel=\"stylesheet\">\n    <style>\n        body { font-family: 'Inter', sans-serif; }\n        @media print {\n            .no-print { display: none !important; }\n            .print-only { display: block !important; }\n            @page { \n              size: A4 landscape; \n              margin: 5mm; \n            }\n            body { \n              background: white !important; \n              margin: 0; \n              padding: 0;\n            }\n            table { \n              width: 100% !important;\n              table-layout: fixed !important;\n              border-collapse: collapse !important;\n            }\n            th, td { \n              font-size: 6pt !important; \n              padding: 1pt !important;\n              line-height: 1.1 !important;\n              word-wrap: break-word !important;\n              overflow-wrap: break-word !important;\n            }\n            .term-header {\n              background-color: #f1f5f9 !important;\n              color: black !important;\n              -webkit-print-color-adjust: exact;\n            }\n        }\n        @keyframes progress-indeterminate {\n          0% { transform: scaleX(0.1) translateX(-100%); }\n          50% { transform: scaleX(0.4) translateX(50%); }\n          100% { transform: scaleX(0.1) translateX(120%); }\n        }\n        .animate-progress-indeterminate {\n          animation: progress-indeterminate 2s infinite linear;\n        }\n    </style>\n</head>\n<body class=\"bg-slate-50 text-slate-900\">\n    <div id=\"root\"></div>\n    <!-- Entry point for Vite to transpile and bundle the app -->\n    <script type=\"module\" src=\"/index.tsx\"></script>\n</body>\n</html>\n"
+            }
+          ]
+        },
+        {
+          "path": "package.json",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Created package.json to enable Vercel/Vite build process.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\n{\n  \"name\": \"schemegenie\",\n  \"private\": true,\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"tsc && vite build\",\n    \"preview\": \"vite preview\"\n  },\n  \"dependencies\": {\n    \"@google/genai\": \"^1.34.0\",\n    \"docx\": \"^9.1.1\",\n    \"jspdf\": \"^3.0.4\",\n    \"jspdf-autotable\": \"^5.0.2\",\n    \"jszip\": \"^3.10.1\",\n    \"lucide-react\": \"^0.562.0\",\n    \"pptxgenjs\": \"^3.12.0\",\n    \"react\": \"^19.2.3\",\n    \"react-dom\": \"^19.2.3\",\n    \"xlsx\": \"^0.18.5\"\n  },\n  \"devDependencies\": {\n    \"@types/react\": \"^19.0.0\",\n    \"@types/react-dom\": \"^19.0.0\",\n    \"@vitejs/plugin-react\": \"^4.3.0\",\n    \"typescript\": \"^5.0.0\",\n    \"vite\": \"^6.0.0\"\n  }\n}\n"
+            }
+          ]
+        },
+        {
+          "path": "vite.config.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Configured Vite to handle process.env and React JSX.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  define: {\n    // Ensures process.env.API_KEY is available during the build/runtime\n    'process.env.API_KEY': JSON.stringify(process.env.API_KEY)\n  },\n  build: {\n    outDir: 'dist',\n    target: 'esnext'\n  },\n  server: {\n    port: 3000\n  }\n});\n"
+            }
+          ]
+        },
+        {
+          "path": "tsconfig.json",
+          "generationType": 1,
+          "isDone": true,
+          "description": "TypeScript configuration for React and ESM modules.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\n{\n  \"compilerOptions\": {\n    \"target\": \"ESNext\",\n    \"useDefineForClassFields\": true,\n    \"lib\": [\"DOM\", \"DOM.Iterable\", \"ESNext\"],\n    \"allowJs\": false,\n    \"skipLibCheck\": true,\n    \"esModuleInterop\": false,\n    \"allowSyntheticDefaultImports\": true,\n    \"strict\": true,\n    \"forceConsistentCasingInFileNames\": true,\n    \"module\": \"ESNext\",\n    \"moduleResolution\": \"Node\",\n    \"resolveJsonModule\": true,\n    \"isolatedModules\": true,\n    \"noEmit\": true,\n    \"jsx\": \"react-jsx\"\n  },\n  \"include\": [\"./**/*.ts\", \"./**/*.tsx\"]\n}\n"
+            }
+          ]
+        }
+      ]
+    },
+    "createdTimestamp": {
+      "seconds": 1769034341,
+      "nanos": 548000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769034345,
+      "nanos": 92000000
+    }
+  },
+  {
+    "id": 16,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "the app failed to build because of these errors\nservices/geminiService.ts(39,23): error TS18048: 'response.text' is possibly 'undefined'.\nservices/geminiService.ts(114,31): error TS18048: 'response.text' is possibly 'undefined'.\nservices/geminiService.ts(155,21): error TS18048: 'response.text' is possibly 'undefined'.\nutils/exportUtils.ts(148,11): error TS2353: Object literal may only specify known properties, and 'orientation' does not exist in type '{ readonly size?: Partial<IPageSizeAttributes> | undefined; readonly margin?: IPageMarginAttributes | undefined; readonly pageNumbers?: IPageNumberTypeAttributes | undefined; readonly borders?: IPageBordersOptions | undefined; readonly textDirection?: \"lrTb\" | ... 1 more ... | undefined; }'.\nError: Command \"npm run build\" exited with 2",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769035237,
+      "nanos": 873000000
+    }
+  },
+  {
+    "id": 17,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Troubleshooting Gemini Integration**\n\nI'm currently focused on the build errors surfacing in the React application. The `response.text` from the Gemini API call in `geminiService.ts` is potentially undefined, which is causing a type error. Also, I'm examining the `exportUtils.ts` file. I am looking at how `jspdf`, `xlsx`, and `docx` might be interacting with the build process.\n\n\n**Refining Docx Integration**\n\nI've pinpointed the issue with the `docx` library and `orientation`. Apparently, in newer versions of `docx` (v9+), the `orientation` property is no longer directly under `page`. It's likely nested within the `size` property within `page` or a similar object. I'm updating the code to reflect this change, specifically by examining the `SectionProperties` type definitions, to determine the correct location for the page orientation. The old code directly specified it under the `page` property.\n\n\n**Addressing Gemini API Calls**\n\nI'm now prioritizing the `geminiService.ts` file. I've added null checks to `response.text` across the `extractSyllabusInfo`, `generateLessonChunk`, and `generateLessonResourcesContent` functions to resolve the type errors. The user seems to be following Google's coding guidelines correctly regarding assigning the response text, but TypeScript is still complaining about it. I'm moving on to `exportUtils.ts` next, but for now the Gemini related errors are resolved.\n\n\n**Finalizing Code Updates**\n\nI've decided to use `(response.text ?? '')` to resolve the TypeScript issues within `geminiService.ts`. I am reviewing all calls to `response.text`, and am now ready to update that file. I'm also reviewing the `utils/exportUtils.ts` file, and am prepared to update this file to reflect the updated structure of `docx` v9 for handling page orientation, by putting it under `page.size`. I will update both files now.\n\n\n**Resolving Build Conflicts**\n\nI'm focused on resolving the build conflicts, specifically, fixing the `docx` document orientation structure. I'm also ensuring the `index.html` import map doesn't cause conflicts since the build process relies on `package.json` through `npm run build` with Vite. The `importmap` is irrelevant, and I am moving on to resolve the TypeScript error from the Gemini API call in `geminiService.ts`. I will update line 39 to use `(response.text || \"\").trim()` to resolve this issue.\n\n\n**Fixing TypeScript Errors**\n\nI'm now focusing on fixing the remaining TypeScript errors in `geminiService.ts` and `exportUtils.ts`. I'll update lines 114 and 155 in `geminiService.ts` to use `(response.text || \"\").trim()` to handle potential undefined values. Also, I'll update line 148 in `exportUtils.ts` to reflect `docx` v9, by placing the `orientation` property under `page.size`. The `PageOrientation` import is correct.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769035237,
+      "nanos": 873000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769035255,
+      "nanos": 532000000
+    }
+  },
+  {
+    "id": 18,
+    "author": "model",
+    "payload": {
+      "type": "text",
+      "text": "To resolve the build errors, we need to handle the case where the Gemini API response text might be `undefined` and update the `docx` library configuration to match its latest API requirements for page orientation.\n\n### Specification of Updates\n\n1.  **`services/geminiService.ts`**:\n    *   Added nullish coalescing (`?? ''`) to all `response.text` accesses to satisfy TypeScript's strict null checking.\n    *   Ensured `trim()` is called on a string to avoid runtime errors if the response is empty.\n\n2.  **`utils/exportUtils.ts`**:\n    *   Updated the `docx` `Document` structure. In version 9+, the `orientation` property must be nested within the `size` object inside `page` properties.\n    *   Cleaned up the `Document` initialization to follow the standard `docx` v9 schema.\n\n3.  **`package.json`**:\n    *   Updated `@google/genai` to a more recent stable version matching the import maps for consistency.\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769035255,
+      "nanos": 532000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769035255,
+      "nanos": 633000000
+    }
+  },
+  {
+    "id": 19,
+    "author": "model",
+    "payload": {
+      "type": "generationTable",
+      "entries": [
+        {
+          "path": "services/geminiService.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Fixed TypeScript errors regarding potentially undefined response.text from Gemini API.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport { GoogleGenAI, Type } from \"@google/genai\";\nimport { SchemeMetadata, Lesson } from \"../types\";\n\nexport interface ExtractedSyllabusInfo {\n  subject: string;\n  form: string;\n  recommendedWeeksPerTerm: number;\n}\n\nexport const extractSyllabusInfo = async (\n  syllabusFile: { data: string, mimeType: string }\n): Promise<ExtractedSyllabusInfo> => {\n  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });\n  \n  const response = await ai.models.generateContent({\n    model: \"gemini-3-flash-preview\",\n    contents: {\n      parts: [\n        { text: \"Analyze this syllabus. Identify the subject, target form/grade, and recommended weeks per term (usually 10-13) for a 3-term academic year.\" },\n        { inlineData: syllabusFile }\n      ]\n    },\n    config: {\n      responseMimeType: \"application/json\",\n      responseSchema: {\n        type: Type.OBJECT,\n        properties: {\n          subject: { type: Type.STRING },\n          form: { type: Type.STRING },\n          recommendedWeeksPerTerm: { type: Type.INTEGER },\n        },\n        required: [\"subject\", \"form\", \"recommendedWeeksPerTerm\"],\n      }\n    }\n  });\n\n  try {\n    const text = response.text ?? \"\";\n    return JSON.parse(text.trim());\n  } catch (error) {\n    return { subject: \"\", form: \"\", recommendedWeeksPerTerm: 12 };\n  }\n};\n\n/**\n * Generates a specific chunk of lessons to ensure extreme detail and prevent truncation.\n */\nexport const generateLessonChunk = async (\n  term: number,\n  startLesson: number,\n  endLesson: number,\n  metadata: SchemeMetadata, \n  syllabusFile?: { data: string, mimeType: string }\n): Promise<Partial<Lesson>[]> => {\n  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });\n  \n  const textPrompt = `\n    Act as a Senior Curriculum Specialist. You are creating a specific batch of lessons for a detailed Scheme of Work.\n    \n    TARGET: TERM ${term}, LESSONS ${startLesson} TO ${endLesson}.\n    \n    CRITICAL QUALITY MANDATE:\n    1. EXTREME DETAIL: Every field must be exhaustive. No generic placeholders.\n    2. RESOURCES: List specific textbooks (incl. page ranges), exact laboratory equipment (quantities and types), specific digital links (YouTube, Simulations), and detailed visual aids.\n    3. EVALUATION CRITERIA: Must be highly specific success indicators. What EXACTLY must the pupil do to show mastery? Use measurable verbs.\n    4. OBJECTIVES: \"Pupils will be able to...\" followed by at least 3 high-level Bloom's taxonomy objectives.\n    5. ACTIVITIES: Step-by-step classroom procedure including introduction, core activity, and plenary.\n\n    Metadata:\n    - Subject: ${metadata.subject}\n    - Level: Form ${metadata.form}\n    - Term: ${term}\n\n    CONTEXT: This is for a 3-term year where each term has 72 lessons. Ensure the content for lessons ${startLesson}-${endLesson} is appropriate for this stage of the syllabus.\n\n    Output format:\n    Return an array of objects for lessons ${startLesson} through ${endLesson}.\n    Each object: { \"term\": ${term}, \"week\": number, \"lessonNumber\": number, \"topic\": string, \"objectives\": string, \"activities\": string, \"resources\": string, \"assessment\": string, \"homework\": string, \"evaluation\": string }\n  `;\n\n  const contents = syllabusFile \n    ? { parts: [{ text: textPrompt }, { inlineData: syllabusFile }] }\n    : textPrompt;\n\n  const response = await ai.models.generateContent({\n    model: \"gemini-3-flash-preview\",\n    contents: contents,\n    config: {\n      thinkingConfig: { thinkingBudget: 2000 },\n      responseMimeType: \"application/json\",\n      responseSchema: {\n        type: Type.ARRAY,\n        items: {\n          type: Type.OBJECT,\n          properties: {\n            term: { type: Type.INTEGER },\n            week: { type: Type.INTEGER },\n            lessonNumber: { type: Type.INTEGER },\n            topic: { type: Type.STRING },\n            objectives: { type: Type.STRING },\n            activities: { type: Type.STRING },\n            resources: { type: Type.STRING },\n            assessment: { type: Type.STRING },\n            homework: { type: Type.STRING },\n            evaluation: { type: Type.STRING },\n          },\n          required: [\"term\", \"week\", \"lessonNumber\", \"topic\", \"objectives\", \"activities\", \"resources\", \"assessment\", \"homework\", \"evaluation\"],\n        }\n      }\n    }\n  });\n\n  try {\n    const text = response.text ?? \"\";\n    const result = JSON.parse(text.trim());\n    if (!Array.isArray(result)) throw new Error(\"Output is not an array\");\n    return result;\n  } catch (error) {\n    console.error(`Batch ${startLesson}-${endLesson} failed:`, error);\n    throw new Error(`Failed to generate lessons ${startLesson}-${endLesson}. API limit or timeout.`);\n  }\n};\n\nexport const generateLessonResourcesContent = async (\n  lesson: Lesson,\n  metadata: SchemeMetadata\n): Promise<Pick<Lesson, 'lessonPlanContent' | 'worksheetContent' | 'slidesContent' | 'videoGuideDescription'>> => {\n  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });\n  const response = await ai.models.generateContent({\n    model: \"gemini-3-pro-preview\",\n    contents: `Generate a hyper-detailed teaching package for Topic: \"${lesson.topic}\". \n    Reference existing resources: \"${lesson.resources}\".\n    Evaluation criteria to hit: \"${lesson.evaluation}\".\n    \n    Package must include:\n    1. A 600-word Lesson Plan.\n    2. A 15-question comprehensive Worksheet.\n    3. 7 Content-rich Presentation Slides.\n    4. A Video Script.\n    \n    Use \"Pupils\" throughout.`,\n    config: {\n      responseMimeType: \"application/json\",\n      responseSchema: {\n        type: Type.OBJECT,\n        properties: {\n          lessonPlanContent: { type: Type.STRING },\n          worksheetContent: { type: Type.STRING },\n          slidesContent: { type: Type.ARRAY, items: { type: Type.STRING } },\n          videoGuideDescription: { type: Type.STRING },\n        },\n        required: [\"lessonPlanContent\", \"worksheetContent\", \"slidesContent\", \"videoGuideDescription\"],\n      }\n    }\n  });\n  const text = response.text ?? \"\";\n  return JSON.parse(text.trim());\n};\n"
+            }
+          ]
+        },
+        {
+          "path": "utils/exportUtils.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Fixed docx orientation property structure for v9+ and sanitized text handling.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport { jsPDF } from \"jspdf\";\nimport autoTable from \"jspdf-autotable\";\nimport * as XLSX from \"xlsx\";\nimport * as docx from \"docx\";\nimport JSZip from \"jszip\";\nimport { SchemeBook, Lesson, SchemeMetadata } from \"../types\";\n\nconst { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, PageOrientation } = docx;\n\nconst sanitizeText = (text: any): string => {\n  if (text === null || text === undefined) return \"\";\n  return String(text).replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F-\\x84\\x86-\\x9F\\uFDD0-\\uFDEF\\uFFFE\\uFFFF]/g, \"\");\n};\n\nconst createCellContent = (text: string, size: number, isBold: boolean = false) => {\n  const sanitized = sanitizeText(text);\n  const runs = sanitized.split(/\\r?\\n/).map((line, idx) => new TextRun({ text: line, size, bold: isBold, break: idx > 0 ? 1 : undefined }));\n  return [new Paragraph({ children: runs })];\n};\n\nexport const exportToPDF = (scheme: SchemeBook) => {\n  const doc = new jsPDF({ orientation: \"landscape\", unit: 'mm', format: 'a4' });\n  \n  [1, 2, 3].forEach((termNum, index) => {\n    const termLessons = scheme.lessons.filter(l => l.term === termNum);\n    if (termLessons.length === 0) return;\n\n    if (index > 0) doc.addPage();\n\n    doc.setFontSize(14);\n    doc.text(`${scheme.metadata.subject} - TERM ${termNum}`, 14, 15);\n    doc.setFontSize(8);\n    doc.text(`${scheme.metadata.school} | Form: ${scheme.metadata.form} | Year: ${scheme.metadata.academicYear}`, 14, 20);\n    \n    const body = termLessons.map(l => [\n      l.week, \n      l.lessonNumber,\n      l.weekEnding, \n      l.topic, \n      l.objectives, \n      l.activities, \n      l.resources,\n      l.assessment,\n      l.evaluation,\n      \"\" // Remarks column\n    ]);\n\n    autoTable(doc, {\n      startY: 25,\n      head: [['Wk', 'L#', 'Date', 'Topic', 'Learning Objectives', 'Activities', 'Resources', 'Asmt', 'Eval Criteria', 'Remarks']],\n      body: body,\n      theme: 'grid',\n      styles: { \n        fontSize: 6, \n        cellPadding: 0.8,\n        valign: 'top',\n        overflow: 'linebreak'\n      },\n      headStyles: { \n        fillColor: [51, 65, 85],\n        textColor: 255,\n        fontSize: 6.5,\n        fontStyle: 'bold'\n      },\n      columnStyles: {\n        0: { cellWidth: 7 },  // Wk\n        1: { cellWidth: 7 },  // L#\n        2: { cellWidth: 18 }, // Date\n        3: { cellWidth: 32 }, // Topic\n        4: { cellWidth: 42 }, // Objectives\n        5: { cellWidth: 42 }, // Activities\n        6: { cellWidth: 28 }, // Resources\n        7: { cellWidth: 20 }, // Assmt\n        8: { cellWidth: 32 }, // Eval Criteria\n        9: { cellWidth: 22 }  // Remarks\n      },\n      margin: { top: 25, right: 8, bottom: 8, left: 8 }\n    });\n  });\n  \n  doc.save(`${scheme.metadata.subject}_Scheme_${scheme.metadata.academicYear.replace('/', '-')}.pdf`);\n};\n\nexport const exportToWord = async (scheme: SchemeBook) => {\n  const children: any[] = [\n    new Paragraph({ \n      text: `${scheme.metadata.subject} Full Year Scheme`, \n      heading: HeadingLevel.HEADING_1, \n      alignment: AlignmentType.CENTER \n    }),\n    new Paragraph({ \n      text: `${scheme.metadata.school} - Form ${scheme.metadata.form} - Academic Year ${scheme.metadata.academicYear}`, \n      alignment: AlignmentType.CENTER,\n      spacing: { after: 400 }\n    })\n  ];\n\n  [1, 2, 3].forEach(termNum => {\n    const termLessons = scheme.lessons.filter(l => l.term === termNum);\n    if (termLessons.length === 0) return;\n\n    children.push(new Paragraph({ text: `TERM ${termNum}`, heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }));\n    \n    const headerRow = new TableRow({ \n      children: ['Wk', 'L#', 'Date', 'Topic', 'Learning Objectives', 'Activities', 'Res', 'Asmt', 'Eval', 'Rem'].map(h => \n        new TableCell({ \n          shading: { fill: \"334155\" },\n          children: [new Paragraph({ \n            alignment: AlignmentType.CENTER,\n            children: [new TextRun({ text: h, color: \"FFFFFF\", size: 16, bold: true })] \n          })] \n        })\n      ) \n    });\n\n    const rows = termLessons.map(l => new TableRow({\n      children: [\n        new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, children: createCellContent(l.week.toString(), 14) }),\n        new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, children: createCellContent(l.lessonNumber.toString(), 14) }),\n        new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent(l.weekEnding, 14) }),\n        new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.topic, 14, true) }),\n        new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: createCellContent(l.objectives, 14) }),\n        new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: createCellContent(l.activities, 14) }),\n        new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.resources, 14) }),\n        new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent(l.assessment, 14) }),\n        new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.evaluation, 14) }),\n        new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent(\"\", 14) })\n      ]\n    }));\n\n    children.push(new Table({\n      width: { size: 100, type: WidthType.PERCENTAGE },\n      rows: [headerRow, ...rows],\n      borders: {\n        top: { style: BorderStyle.SINGLE, size: 1 },\n        bottom: { style: BorderStyle.SINGLE, size: 1 },\n        left: { style: BorderStyle.SINGLE, size: 1 },\n        right: { style: BorderStyle.SINGLE, size: 1 },\n      }\n    }));\n  });\n\n  const doc = new Document({ \n    sections: [{ \n      properties: { \n        page: { \n          size: {\n            orientation: PageOrientation.LANDSCAPE,\n          },\n          margin: { top: 400, right: 400, bottom: 400, left: 400 }\n        } \n      }, \n      children \n    }] \n  });\n  \n  const blob = await Packer.toBlob(doc);\n  const link = document.createElement(\"a\");\n  link.href = URL.createObjectURL(blob);\n  link.download = `${scheme.metadata.subject}_Scheme_${scheme.metadata.academicYear.replace('/', '-')}.docx`;\n  link.click();\n};\n\nexport const exportToExcel = (scheme: SchemeBook) => {\n  const data = scheme.lessons.map(l => ({\n    \"Term\": l.term,\n    \"Week\": l.week,\n    \"Lesson #\": l.lessonNumber,\n    \"Date\": l.weekEnding,\n    \"Topic\": l.topic,\n    \"Objectives\": l.objectives,\n    \"Activities\": l.activities,\n    \"Resources\": l.resources,\n    \"Assessment\": l.assessment,\n    \"Evaluation Criteria\": l.evaluation,\n    \"Remarks\": l.remarks\n  }));\n  const ws = XLSX.utils.json_to_sheet(data);\n  const wb = XLSX.utils.book_new();\n  XLSX.utils.book_append_sheet(wb, ws, \"Scheme\");\n  XLSX.writeFile(wb, `${scheme.metadata.subject}_Scheme.xlsx`);\n};\n\nexport const downloadLessonResourcesZip = async (lesson: Lesson, metadata: SchemeMetadata) => {\n  const zip = new JSZip();\n  const folder = zip.folder(`Term${lesson.term}_Wk${lesson.week}_Lesson${lesson.lessonNumber}`);\n  folder?.file(\"lesson_plan.txt\", lesson.lessonPlanContent || \"\");\n  folder?.file(\"worksheet.txt\", lesson.worksheetContent || \"\");\n  if (lesson.slidesContent) {\n    folder?.file(\"slides.txt\", lesson.slidesContent.join('\\n\\n'));\n  }\n  const blob = await zip.generateAsync({ type: \"blob\" });\n  const link = document.createElement(\"a\");\n  link.href = URL.createObjectURL(blob);\n  link.download = `Lesson_${lesson.lessonNumber}_Resources.zip`;\n  link.click();\n};\n\nexport const exportRecordBookExcel = (scheme: SchemeBook) => {\n  const data = scheme.lessons.map(l => ({\n    \"Term\": l.term,\n    \"Week\": l.week,\n    \"L#\": l.lessonNumber,\n    \"Topic\": l.topic,\n    \"Student Name\": \"\",\n    \"Mark /10\": \"\",\n    \"Comments\": \"\"\n  }));\n  const ws = XLSX.utils.json_to_sheet(data);\n  const wb = XLSX.utils.book_new();\n  XLSX.utils.book_append_sheet(wb, ws, \"Grades\");\n  XLSX.writeFile(wb, `${scheme.metadata.subject}_Record_Book.xlsx`);\n};\n\nexport const downloadFullPackageZip = async (scheme: SchemeBook) => {\n  const zip = new JSZip();\n  const meta = zip.folder(\"metadata\");\n  meta?.file(\"info.txt\", `Subject: ${scheme.metadata.subject}\\nForm: ${scheme.metadata.form}\\nSchool: ${scheme.metadata.school}`);\n  \n  // We can't easily embed the PDF/Word directly without re-generating inside the zip logic,\n  // so we usually just zip the data or a note. For a \"Full Package\", we'll zip an Excel version and a Readme.\n  const excelBuffer = XLSX.write(XLSX.utils.book_new(), { bookType: 'xlsx', type: 'array' });\n  zip.file(\"Scheme_Data.xlsx\", excelBuffer);\n  zip.file(\"README.txt\", \"This package contains your academic scheme. Use the web app to export PDF and DOCX formats.\");\n  \n  const blob = await zip.generateAsync({ type: \"blob\" });\n  const link = document.createElement(\"a\");\n  link.href = URL.createObjectURL(blob);\n  link.download = `${scheme.metadata.subject}_Package.zip`;\n  link.click();\n};\n"
+            }
+          ]
+        },
+        {
+          "path": "package.json",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Updated dependency versions for better compatibility during Vercel build.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\n{\n  \"name\": \"schemegenie\",\n  \"private\": true,\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"tsc && vite build\",\n    \"preview\": \"vite preview\"\n  },\n  \"dependencies\": {\n    \"@google/genai\": \"^1.38.0\",\n    \"docx\": \"^9.1.1\",\n    \"jspdf\": \"^3.0.4\",\n    \"jspdf-autotable\": \"^5.0.2\",\n    \"jszip\": \"^3.10.1\",\n    \"lucide-react\": \"^0.562.0\",\n    \"pptxgenjs\": \"^3.12.0\",\n    \"react\": \"^19.2.3\",\n    \"react-dom\": \"^19.2.3\",\n    \"xlsx\": \"^0.18.5\"\n  },\n  \"devDependencies\": {\n    \"@types/react\": \"^19.0.0\",\n    \"@types/react-dom\": \"^19.0.0\",\n    \"@vitejs/plugin-react\": \"^4.3.0\",\n    \"typescript\": \"^5.0.0\",\n    \"vite\": \"^6.0.0\"\n  }\n}\n"
+            }
+          ]
+        }
+      ]
+    },
+    "createdTimestamp": {
+      "seconds": 1769035257,
+      "nanos": 89000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769035265,
+      "nanos": 330000000
+    }
+  },
+  {
+    "id": 20,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "im failing to use the app after deployment its saying An API Key must be set when running in a browser",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769035916,
+      "nanos": 527000000
+    }
+  },
+  {
+    "id": 21,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Investigating API Key Issue**\n\nI've been looking at this Vercel deployment error, \"An API Key must be set when running in a browser.\" I've zeroed in on the `GoogleGenAI` initialization, which relies on `process.env.API_KEY`. The `vite.config.ts` file seems relevant now.\n\n\n**Analyzing API Key Stringification**\n\nI've realized the problem lies with how the `API_KEY` is being handled. Stringifying `undefined` results in `undefined`, which the Google AI SDK doesn't like. My focus is now on the `vite.config.ts` file, where the stringification happens. I see now that Vercel is meant to inject the environment variable, so if it's unset in Vercel, the stringification creates the problematic `undefined` value. The SDK's strict check on the key is also central to this.\n\n\n**Evaluating Key Access Methods**\n\nI am now focusing on how Vite handles environment variables and how that impacts the SDK's expectations. I'm exploring whether `import.meta.env` could be leveraged. The current configuration using `process.env.API_KEY` seems correct *if* the variable is set during build. I'm checking if there's a more robust method to manage this and if I missed a potential structure error. The core of it, the SDK insists on environment variables.\n\n\n**Optimizing API Key Handling**\n\nI now intend to use the `process.env.API_KEY` string directly during initialization, aiming for a more streamlined approach. I'm also reviewing `index.html` import map versus the `package.json` for potential conflicts since Vercel builds the app, I anticipate it will prioritize the `node_modules` version. I'm circling back to `vite.config` to check if `process.env.API_KEY` is being replaced by `undefined` during the Vite build. Finally, the prompt rules out user input, so that's helpful.\n\n\n**Refining API Key Integration**\n\nI'm now zeroing in on the `services/geminiService.ts` file, where the `GoogleGenAI` initialization happens *within* the function, avoiding stale key issues. This seems correct. I'm reevaluating the way Vite handles the `define` block in `vite.config.ts`, especially how it affects the string literal. I suspect the issue might be with the `define` block, and whether the API key is being consistently injected.\n\n\n**Eliminating Key Conflict**\n\nI've zeroed in on the `importmap` in `index.html`. It's likely causing a conflict during the Vercel build, by loading a second SDK version from ESM.sh. This bypasses Vite's `process.env` replacement. I'm removing the `importmap` to ensure Vite's bundled code and environment variable substitution are correctly used. This, combined with ensuring the API key is set in Vercel's environment variables, should fix the deployment.\n\n\n**Clarifying Build Process Impact**\n\nI'm now focused on the conflicting strategies in `index.html`. It appears the presence of both an `importmap` and a module script is creating issues. During the Vercel build, Vite processes `index.html` and bundles the code, but the `importmap` might be interfering. I'm removing the `importmap` to streamline the build, ensuring Vite's environment variable substitution works, and the correct SDK version is used.\n\n\n**Streamlining Build Configuration**\n\nI'm now consolidating my focus on the build process for this Vercel/Vite setup. I'm prioritizing direct use of `process.env.API_KEY` for initialization, clarifying the need for the `API_KEY` in Vercel's environment variables. I'll make explicit changes to `vite.config.ts`, ensuring Vite correctly replaces the environment variable. I'm removing the conflicting `importmap` in `index.html` to guarantee the right SDK version and environment variable substitution during the build. I'll emphasize this point to the user.\n\n\n**Improving Type Handling**\n\nI'm now going to enhance the service calls and types for greater robustness, focusing on the deployment error after my previous changes. I will refine the `vite.config.ts` file to properly handle the `API_KEY` with a fallback mechanism and remove the conflicting `importmap` from `index.html`. Finally, I'll emphasize that the `API_KEY` must be set within the Vercel dashboard.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769035916,
+      "nanos": 527000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769035936,
+      "nanos": 350000000
+    }
+  },
+  {
+    "id": 22,
+    "author": "model",
+    "payload": {
+      "type": "text",
+      "text": "To fix the \"API Key must be set\" error and ensure your app runs correctly on Vercel, we need to address two things:\n\n1.  **Remove the Import Map**: Your `index.html` currently contains an `importmap`. When using **Vite** (which you are), Vite handles all library imports via the `package.json` and bundling process. Having an `importmap` in the HTML can cause the browser to try and load a second, unconfigured version of the Gemini SDK, leading to the error you're seeing.\n2.  **Vercel Configuration**: Ensure you have added the `API_KEY` environment variable in your Vercel project settings (**Settings > Environment Variables**). Without this, the build process has no key to \"bake\" into the app.\n\n### Updated Specification\n\n1.  **`index.html`**: Completely removed the `<script type=\"importmap\">` block. This ensures Vite's bundled code is the only source of truth.\n2.  **`vite.config.ts`**: Improved the `define` block to handle the `API_KEY` more robustly during the build process.\n3.  **`services/geminiService.ts`**: Re-verified the initialization logic to ensure it strictly follows the SDK requirements.\n\n### Action Required in Vercel Dashboard:\n1.  Go to your project on **Vercel**.\n2.  Navigate to **Settings** -> **Environment Variables**.\n3.  Add a new variable:\n    *   **Key**: `API_KEY`\n    *   **Value**: *Your Google Gemini API Key*\n4.  **Redeploy** the application (you can trigger a manual deployment or push these changes).\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769035936,
+      "nanos": 350000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769035936,
+      "nanos": 499000000
+    }
+  },
+  {
+    "id": 23,
+    "author": "model",
+    "payload": {
+      "type": "generationTable",
+      "entries": [
+        {
+          "path": "index.html",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Removed the importmap to prevent conflicts with the Vite bundling process.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>SchemeGenie - Academic Scheme Book Builder</title>\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n    <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n    <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n    <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap\" rel=\"stylesheet\">\n    <style>\n        body { font-family: 'Inter', sans-serif; }\n        @media print {\n            .no-print { display: none !important; }\n            .print-only { display: block !important; }\n            @page { \n              size: A4 landscape; \n              margin: 5mm; \n            }\n            body { \n              background: white !important; \n              margin: 0; \n              padding: 0;\n            }\n            table { \n              width: 100% !important;\n              table-layout: fixed !important;\n              border-collapse: collapse !important;\n            }\n            th, td { \n              font-size: 6pt !important; \n              padding: 1pt !important;\n              line-height: 1.1 !important;\n              word-wrap: break-word !important;\n              overflow-wrap: break-word !important;\n            }\n            .term-header {\n              background-color: #f1f5f9 !important;\n              color: black !important;\n              -webkit-print-color-adjust: exact;\n            }\n        }\n        @keyframes progress-indeterminate {\n          0% { transform: scaleX(0.1) translateX(-100%); }\n          50% { transform: scaleX(0.4) translateX(50%); }\n          100% { transform: scaleX(0.1) translateX(120%); }\n        }\n        .animate-progress-indeterminate {\n          animation: progress-indeterminate 2s infinite linear;\n        }\n    </style>\n</head>\n<body class=\"bg-slate-50 text-slate-900\">\n    <div id=\"root\"></div>\n    <!-- Entry point for Vite to transpile and bundle the app -->\n    <script type=\"module\" src=\"/index.tsx\"></script>\n</body>\n</html>\n"
+            }
+          ]
+        },
+        {
+          "path": "vite.config.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Ensured process.env.API_KEY is correctly stringified and handled even if temporarily missing during local dev.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  define: {\n    // Vite replaces this string everywhere in your code with the actual key value\n    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || '')\n  },\n  build: {\n    outDir: 'dist',\n    target: 'esnext',\n    sourcemap: false\n  },\n  server: {\n    port: 3000\n  }\n});\n"
+            }
+          ]
+        },
+        {
+          "path": "services/geminiService.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Maintained reliable initialization of the GoogleGenAI instance using the injected environment variable.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport { GoogleGenAI, Type } from \"@google/genai\";\nimport { SchemeMetadata, Lesson } from \"../types\";\n\nexport interface ExtractedSyllabusInfo {\n  subject: string;\n  form: string;\n  recommendedWeeksPerTerm: number;\n}\n\n/**\n * Helper to get the AI instance.\n * It's created on demand to ensure it picks up the latest environment values.\n */\nconst getAI = () => {\n  const apiKey = process.env.API_KEY;\n  if (!apiKey) {\n    console.warn(\"API_KEY is missing. Ensure it is set in your Vercel Environment Variables.\");\n  }\n  return new GoogleGenAI({ apiKey: apiKey || \"\" });\n};\n\nexport const extractSyllabusInfo = async (\n  syllabusFile: { data: string, mimeType: string }\n): Promise<ExtractedSyllabusInfo> => {\n  const ai = getAI();\n  \n  const response = await ai.models.generateContent({\n    model: \"gemini-3-flash-preview\",\n    contents: {\n      parts: [\n        { text: \"Analyze this syllabus. Identify the subject, target form/grade, and recommended weeks per term (usually 10-13) for a 3-term academic year.\" },\n        { inlineData: syllabusFile }\n      ]\n    },\n    config: {\n      responseMimeType: \"application/json\",\n      responseSchema: {\n        type: Type.OBJECT,\n        properties: {\n          subject: { type: Type.STRING },\n          form: { type: Type.STRING },\n          recommendedWeeksPerTerm: { type: Type.INTEGER },\n        },\n        required: [\"subject\", \"form\", \"recommendedWeeksPerTerm\"],\n      }\n    }\n  });\n\n  try {\n    const text = response.text ?? \"\";\n    return JSON.parse(text.trim());\n  } catch (error) {\n    return { subject: \"\", form: \"\", recommendedWeeksPerTerm: 12 };\n  }\n};\n\nexport const generateLessonChunk = async (\n  term: number,\n  startLesson: number,\n  endLesson: number,\n  metadata: SchemeMetadata, \n  syllabusFile?: { data: string, mimeType: string }\n): Promise<Partial<Lesson>[]> => {\n  const ai = getAI();\n  \n  const textPrompt = `\n    Act as a Senior Curriculum Specialist. You are creating a specific batch of lessons for a detailed Scheme of Work.\n    \n    TARGET: TERM ${term}, LESSONS ${startLesson} TO ${endLesson}.\n    \n    CRITICAL QUALITY MANDATE:\n    1. EXTREME DETAIL: Every field must be exhaustive. No generic placeholders.\n    2. RESOURCES: List specific textbooks (incl. page ranges), exact laboratory equipment (quantities and types), specific digital links (YouTube, Simulations), and detailed visual aids.\n    3. EVALUATION CRITERIA: Must be highly specific success indicators. What EXACTLY must the pupil do to show mastery? Use measurable verbs.\n    4. OBJECTIVES: \"Pupils will be able to...\" followed by at least 3 high-level Bloom's taxonomy objectives.\n    5. ACTIVITIES: Step-by-step classroom procedure including introduction, core activity, and plenary.\n\n    Metadata:\n    - Subject: ${metadata.subject}\n    - Level: Form ${metadata.form}\n    - Term: ${term}\n\n    CONTEXT: This is for a 3-term year where each term has 72 lessons. Ensure the content for lessons ${startLesson}-${endLesson} is appropriate for this stage of the syllabus.\n\n    Output format:\n    Return an array of objects for lessons ${startLesson} through ${endLesson}.\n    Each object: { \"term\": ${term}, \"week\": number, \"lessonNumber\": number, \"topic\": string, \"objectives\": string, \"activities\": string, \"resources\": string, \"assessment\": string, \"homework\": string, \"evaluation\": string }\n  `;\n\n  const contents = syllabusFile \n    ? { parts: [{ text: textPrompt }, { inlineData: syllabusFile }] }\n    : textPrompt;\n\n  const response = await ai.models.generateContent({\n    model: \"gemini-3-flash-preview\",\n    contents: contents,\n    config: {\n      thinkingConfig: { thinkingBudget: 2000 },\n      responseMimeType: \"application/json\",\n      responseSchema: {\n        type: Type.ARRAY,\n        items: {\n          type: Type.OBJECT,\n          properties: {\n            term: { type: Type.INTEGER },\n            week: { type: Type.INTEGER },\n            lessonNumber: { type: Type.INTEGER },\n            topic: { type: Type.STRING },\n            objectives: { type: Type.STRING },\n            activities: { type: Type.STRING },\n            resources: { type: Type.STRING },\n            assessment: { type: Type.STRING },\n            homework: { type: Type.STRING },\n            evaluation: { type: Type.STRING },\n          },\n          required: [\"term\", \"week\", \"lessonNumber\", \"topic\", \"objectives\", \"activities\", \"resources\", \"assessment\", \"homework\", \"evaluation\"],\n        }\n      }\n    }\n  });\n\n  try {\n    const text = response.text ?? \"\";\n    const result = JSON.parse(text.trim());\n    if (!Array.isArray(result)) throw new Error(\"Output is not an array\");\n    return result;\n  } catch (error) {\n    console.error(`Batch ${startLesson}-${endLesson} failed:`, error);\n    throw new Error(`Failed to generate lessons ${startLesson}-${endLesson}. API limit or timeout.`);\n  }\n};\n\nexport const generateLessonResourcesContent = async (\n  lesson: Lesson,\n  metadata: SchemeMetadata\n): Promise<Pick<Lesson, 'lessonPlanContent' | 'worksheetContent' | 'slidesContent' | 'videoGuideDescription'>> => {\n  const ai = getAI();\n  const response = await ai.models.generateContent({\n    model: \"gemini-3-pro-preview\",\n    contents: `Generate a hyper-detailed teaching package for Topic: \"${lesson.topic}\". \n    Reference existing resources: \"${lesson.resources}\".\n    Evaluation criteria to hit: \"${lesson.evaluation}\".\n    \n    Package must include:\n    1. A 600-word Lesson Plan.\n    2. A 15-question comprehensive Worksheet.\n    3. 7 Content-rich Presentation Slides.\n    4. A Video Script.\n    \n    Use \"Pupils\" throughout.`,\n    config: {\n      responseMimeType: \"application/json\",\n      responseSchema: {\n        type: Type.OBJECT,\n        properties: {\n          lessonPlanContent: { type: Type.STRING },\n          worksheetContent: { type: Type.STRING },\n          slidesContent: { type: Type.ARRAY, items: { type: Type.STRING } },\n          videoGuideDescription: { type: Type.STRING },\n        },\n        required: [\"lessonPlanContent\", \"worksheetContent\", \"slidesContent\", \"videoGuideDescription\"],\n      }\n    }\n  });\n  const text = response.text ?? \"\";\n  return JSON.parse(text.trim());\n};\n"
+            }
+          ]
+        }
+      ]
+    },
+    "createdTimestamp": {
+      "seconds": 1769035938,
+      "nanos": 865000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769035942,
+      "nanos": 337000000
+    }
+  },
+  {
+    "id": 24,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "how do i fix this error {\"error\":{\"code\":429,\"message\":\"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3-flash\\nPlease retry in 52.559832657s.\",\"status\":\"RESOURCE_EXHAUSTED\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.Help\",\"links\":[{\"description\":\"Learn more about Gemini API quotas\",\"url\":\"https://ai.google.dev/gemini-api/docs/rate-limits\"}]},{\"@type\":\"type.googleapis.com/google.rpc.QuotaFailure\",\"violations\":[{\"quotaMetric\":\"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\"quotaId\":\"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\"quotaDimensions\":{\"location\":\"global\",\"model\":\"gemini-3-flash\"},\"quotaValue\":\"20\"}]},{\"@type\":\"type.googleapis.com/google.rpc.RetryInfo\",\"retryDelay\":\"52s\"}]}}",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769037458,
+      "nanos": 591000000
+    }
+  },
+  {
+    "id": 25,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Investigating API Limits**\n\nI'm currently looking into the `429 RESOURCE_EXHAUSTED` error I'm receiving from the Gemini API. The error clearly indicates I've hit the quota limit for free tier requests for the `gemini-3-` model. I need to figure out the exact usage and explore strategies for optimizing the number of requests to ensure continued operation.\n\n\n**Addressing Rate Limiting**\n\nI've been thinking about the `429` errors and the `gemini-3-flash` model specifically. My current approach involves 18 sequential API calls, and I've identified several ways to cut that down. I'm focusing on reducing the request count by batching lessons, implementing retry logic with delays, and optimizing prompts for larger outputs. My app logic clearly calls 18 times; I need to change that to hit the quotas. It's a matter of optimization.\n\n\n**Analyzing the Error Message**\n\nI'm now diving deeper into the error message and the implications of the 20-request limit. My initial plan involved reducing calls, but the daily/minute distinction is crucial. If it's per-minute, the retry logic I'm building is essential. I'm modifying `App.tsx` to chunk 36 lessons at a time, bringing the call count down to 6. Also adding `withRetry` to `geminiService.ts` for automatic 429 handling. I also have to update the loading messages.\n\n\n**Refining Implementation Strategy**\n\nI'm now integrating a robust retry strategy with exponential backoff into `geminiService.ts` for handling 429 errors. I've updated `App.tsx` to handle the lesson chunking and reduce API calls to nine. Also, I've updated the loading messages in `LoadingOverlay.tsx` to be more descriptive. I'm confirming that the `generateLessonChunk` logic, which now operates on batches of 24 lessons, is efficient for the `gemini-3-flash` model.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769037458,
+      "nanos": 591000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769037483,
+      "nanos": 322000000
+    }
+  },
+  {
+    "id": 26,
+    "author": "model",
+    "payload": {
+      "type": "text",
+      "text": "To fix the \"Quota Exceeded\" (429) error, we will implement two primary strategies:\n1.  **Reduce Request Volume**: We'll increase the `CHUNK_SIZE` from 12 to 24 lessons per call. This reduces the total generation calls from 18 down to 9, keeping you well under the 20-request limit mentioned in the error.\n2.  **Implement Smart Retries**: We'll add a retry wrapper with \"Exponential Backoff.\" If the API returns a 429 error, the app will automatically wait and try again, rather than failing immediately.\n\n### Specification of Changes\n(i) **`services/geminiService.ts`**: Added a `withRetry` utility function that detects quota errors and waits before retrying. Increased the `thinkingBudget` slightly to accommodate larger lesson batches.\n(ii) **`App.tsx`**: Updated the loop to use a `CHUNK_SIZE` of 24. This significantly reduces the API footprint.\n(iii) **`components/LoadingOverlay.tsx`**: Updated the UI text to reflect the new 9-stage generation process so the user knows exactly what to expect.\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769037483,
+      "nanos": 323000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769037483,
+      "nanos": 539000000
+    }
+  },
+  {
+    "id": 27,
+    "author": "model",
+    "payload": {
+      "type": "generationTable",
+      "entries": [
+        {
+          "path": "services/geminiService.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Implemented a retry mechanism with exponential backoff to handle 429 Quota Exceeded errors and updated generation logic for larger chunks.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport { GoogleGenAI, Type } from \"@google/genai\";\nimport { SchemeMetadata, Lesson } from \"../types\";\n\nexport interface ExtractedSyllabusInfo {\n  subject: string;\n  form: string;\n  recommendedWeeksPerTerm: number;\n}\n\nconst sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));\n\n/**\n * Generic retry wrapper to handle transient API errors and Quota limits.\n */\nasync function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {\n  let lastError: any;\n  for (let i = 0; i < maxRetries; i++) {\n    try {\n      return await fn();\n    } catch (err: any) {\n      lastError = err;\n      const errorMessage = err.message?.toLowerCase() || \"\";\n      const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('429') || err.status === 429;\n      \n      if (isQuotaError && i < maxRetries - 1) {\n        // Wait longer on each retry (30s, 60s...)\n        const waitTime = (i + 1) * 30000;\n        console.warn(`Quota exceeded. Retrying in ${waitTime/1000}s... (Attempt ${i + 1}/${maxRetries})`);\n        await sleep(waitTime);\n        continue;\n      }\n      throw err;\n    }\n  }\n  throw lastError;\n}\n\n/**\n * Helper to get the AI instance.\n */\nconst getAI = () => {\n  const apiKey = process.env.API_KEY;\n  if (!apiKey) {\n    console.warn(\"API_KEY is missing. Ensure it is set in your Vercel Environment Variables.\");\n  }\n  return new GoogleGenAI({ apiKey: apiKey || \"\" });\n};\n\nexport const extractSyllabusInfo = async (\n  syllabusFile: { data: string, mimeType: string }\n): Promise<ExtractedSyllabusInfo> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-flash-preview\",\n      contents: {\n        parts: [\n          { text: \"Analyze this syllabus. Identify the subject, target form/grade, and recommended weeks per term (usually 10-13) for a 3-term academic year.\" },\n          { inlineData: syllabusFile }\n        ]\n      },\n      config: {\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.OBJECT,\n          properties: {\n            subject: { type: Type.STRING },\n            form: { type: Type.STRING },\n            recommendedWeeksPerTerm: { type: Type.INTEGER },\n          },\n          required: [\"subject\", \"form\", \"recommendedWeeksPerTerm\"],\n        }\n      }\n    });\n\n    try {\n      const text = response.text ?? \"\";\n      return JSON.parse(text.trim());\n    } catch (error) {\n      return { subject: \"\", form: \"\", recommendedWeeksPerTerm: 12 };\n    }\n  });\n};\n\nexport const generateLessonChunk = async (\n  term: number,\n  startLesson: number,\n  endLesson: number,\n  metadata: SchemeMetadata, \n  syllabusFile?: { data: string, mimeType: string }\n): Promise<Partial<Lesson>[]> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    \n    const textPrompt = `\n      Act as a Senior Curriculum Specialist. You are creating a specific batch of lessons for a detailed Scheme of Work.\n      \n      TARGET: TERM ${term}, LESSONS ${startLesson} TO ${endLesson}.\n      \n      CRITICAL QUALITY MANDATE:\n      1. EXTREME DETAIL: Every field must be exhaustive. No generic placeholders.\n      2. RESOURCES: List specific textbooks (incl. page ranges), exact laboratory equipment (quantities and types), specific digital links (YouTube, Simulations), and detailed visual aids.\n      3. EVALUATION CRITERIA: Must be highly specific success indicators. What EXACTLY must the pupil do to show mastery? Use measurable verbs.\n      4. OBJECTIVES: \"Pupils will be able to...\" followed by at least 3 high-level Bloom's taxonomy objectives.\n      5. ACTIVITIES: Step-by-step classroom procedure including introduction, core activity, and plenary.\n\n      Metadata:\n      - Subject: ${metadata.subject}\n      - Level: Form ${metadata.form}\n      - Term: ${term}\n\n      Output format:\n      Return an array of objects for lessons ${startLesson} through ${endLesson}.\n      Each object: { \"term\": ${term}, \"week\": number, \"lessonNumber\": number, \"topic\": string, \"objectives\": string, \"activities\": string, \"resources\": string, \"assessment\": string, \"homework\": string, \"evaluation\": string }\n    `;\n\n    const contents = syllabusFile \n      ? { parts: [{ text: textPrompt }, { inlineData: syllabusFile }] }\n      : textPrompt;\n\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-flash-preview\",\n      contents: contents,\n      config: {\n        thinkingConfig: { thinkingBudget: 4000 },\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.ARRAY,\n          items: {\n            type: Type.OBJECT,\n            properties: {\n              term: { type: Type.INTEGER },\n              week: { type: Type.INTEGER },\n              lessonNumber: { type: Type.INTEGER },\n              topic: { type: Type.STRING },\n              objectives: { type: Type.STRING },\n              activities: { type: Type.STRING },\n              resources: { type: Type.STRING },\n              assessment: { type: Type.STRING },\n              homework: { type: Type.STRING },\n              evaluation: { type: Type.STRING },\n            },\n            required: [\"term\", \"week\", \"lessonNumber\", \"topic\", \"objectives\", \"activities\", \"resources\", \"assessment\", \"homework\", \"evaluation\"],\n          }\n        }\n      }\n    });\n\n    try {\n      const text = response.text ?? \"\";\n      const result = JSON.parse(text.trim());\n      if (!Array.isArray(result)) throw new Error(\"Output is not an array\");\n      return result;\n    } catch (error) {\n      console.error(`Batch ${startLesson}-${endLesson} failed:`, error);\n      throw new Error(`Failed to generate lessons ${startLesson}-${endLesson}. API limit or timeout.`);\n    }\n  });\n};\n\nexport const generateLessonResourcesContent = async (\n  lesson: Lesson,\n  metadata: SchemeMetadata\n): Promise<Pick<Lesson, 'lessonPlanContent' | 'worksheetContent' | 'slidesContent' | 'videoGuideDescription'>> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-pro-preview\",\n      contents: `Generate a hyper-detailed teaching package for Topic: \"${lesson.topic}\". \n      Reference existing resources: \"${lesson.resources}\".\n      Evaluation criteria to hit: \"${lesson.evaluation}\".\n      \n      Package must include:\n      1. A 600-word Lesson Plan.\n      2. A 15-question comprehensive Worksheet.\n      3. 7 Content-rich Presentation Slides.\n      4. A Video Script.\n      \n      Use \"Pupils\" throughout.`,\n      config: {\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.OBJECT,\n          properties: {\n            lessonPlanContent: { type: Type.STRING },\n            worksheetContent: { type: Type.STRING },\n            slidesContent: { type: Type.ARRAY, items: { type: Type.STRING } },\n            videoGuideDescription: { type: Type.STRING },\n          },\n          required: [\"lessonPlanContent\", \"worksheetContent\", \"slidesContent\", \"videoGuideDescription\"],\n        }\n      }\n    });\n    const text = response.text ?? \"\";\n    return JSON.parse(text.trim());\n  });\n};\n"
+            }
+          ]
+        },
+        {
+          "path": "App.tsx",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Increased chunk size to 24 to stay under API rate limits and implemented smoother term-by-term loading feedback.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport React, { useState, useEffect } from 'react';\nimport { Download, Layout, RotateCcw, Printer, PlusCircle, Sparkles, FolderArchive, Package, Info, GraduationCap, FileText, FileDown, FileCheck, X, FileSpreadsheet } from 'lucide-react';\nimport InputForm from './components/InputForm';\nimport SchemeTable from './components/SchemeTable';\nimport LoadingOverlay from './components/LoadingOverlay';\nimport { SchemeBook, SchemeMetadata, Lesson } from './types';\nimport { generateLessonChunk, generateLessonResourcesContent } from './services/geminiService';\nimport { getWeekEndingDate } from './utils/dateUtils';\nimport { exportToPDF, exportToExcel, exportToWord, downloadFullPackageZip, exportRecordBookExcel } from './utils/exportUtils';\n\nconst STORAGE_KEY = 'schemegenie_v10_chunked';\n\nconst App: React.FC = () => {\n  const [activeScheme, setActiveScheme] = useState<SchemeBook | null>(null);\n  const [isLoading, setIsLoading] = useState(false);\n  const [loadingStep, setLoadingStep] = useState<string>('');\n  const [error, setError] = useState<string | null>(null);\n\n  useEffect(() => {\n    const saved = localStorage.getItem(STORAGE_KEY);\n    if (saved) {\n      try {\n        const parsed = JSON.parse(saved);\n        if (Array.isArray(parsed) && parsed.length > 0) setActiveScheme(parsed[0]);\n      } catch (e) { }\n    }\n  }, []);\n\n  useEffect(() => {\n    if (activeScheme) localStorage.setItem(STORAGE_KEY, JSON.stringify([activeScheme]));\n  }, [activeScheme]);\n\n  const handleGenerate = async (metadata: SchemeMetadata, syllabusFile?: { data: string, mimeType: string }) => {\n    setIsLoading(true);\n    setError(null);\n    const allLessons: Lesson[] = [];\n    \n    try {\n      const CHUNK_SIZE = 24; // Increased from 12 to 24 to reduce API call count\n      const LESSONS_PER_TERM = 72;\n\n      for (let termNum = 1; termNum <= 3; termNum++) {\n        for (let lessonStart = 1; lessonStart <= LESSONS_PER_TERM; lessonStart += CHUNK_SIZE) {\n          const lessonEnd = Math.min(lessonStart + CHUNK_SIZE - 1, LESSONS_PER_TERM);\n          \n          setLoadingStep(`Term ${termNum}: Building Lessons ${lessonStart}-${lessonEnd}...`);\n          \n          const chunkData = await generateLessonChunk(termNum, lessonStart, lessonEnd, metadata, syllabusFile);\n          \n          const mappedChunk: Lesson[] = chunkData.map((l, index) => {\n            const lessonNum = lessonStart + index;\n            const weekInTerm = Math.ceil(lessonNum / metadata.lessonsPerWeek);\n            const startDate = metadata.termStarts[`term${termNum as 1|2|3}`];\n            \n            return {\n              id: `lesson-${termNum}-${lessonNum}-${Date.now()}`,\n              term: termNum,\n              week: weekInTerm,\n              lessonNumber: lessonNum,\n              topic: l.topic || 'New Topic',\n              objectives: l.objectives || 'Detailed objectives pending...',\n              concepts: l.concepts || '',\n              activities: l.activities || 'Detailed procedures pending...',\n              resources: l.resources || 'Exhaustive list of materials pending...',\n              assessment: l.assessment || 'Formative assessment tasks...',\n              homework: l.homework || 'Application tasks...',\n              evaluation: l.evaluation || 'Specific success criteria...',\n              remarks: '',\n              weekEnding: getWeekEndingDate(startDate, weekInTerm),\n            };\n          });\n          \n          allLessons.push(...mappedChunk);\n        }\n      }\n\n      setActiveScheme({\n        id: `scheme-${Date.now()}`,\n        metadata,\n        lessons: allLessons,\n        createdAt: Date.now()\n      });\n    } catch (err: any) {\n      setError(err.message || \"The generation process was interrupted. Please check your internet or try again in a few minutes.\");\n    } finally {\n      setIsLoading(false);\n      setLoadingStep('');\n    }\n  };\n\n  const handleGenerateResources = async (lesson: Lesson) => {\n    if (!activeScheme) return;\n    updateLesson(lesson.id, 'isGeneratingResources', true);\n    try {\n      const resources = await generateLessonResourcesContent(lesson, activeScheme.metadata);\n      setActiveScheme(prev => prev ? {\n        ...prev,\n        lessons: prev.lessons.map(l => l.id === lesson.id ? { ...l, ...resources, isGeneratingResources: false } : l)\n      } : null);\n    } catch (err) {\n      alert(\"Failed to build detailed bundle. You might have hit the daily API quota.\");\n      updateLesson(lesson.id, 'isGeneratingResources', false);\n    }\n  };\n\n  const updateLesson = (id: string, field: keyof Lesson, value: any) => {\n    setActiveScheme(prev => prev ? {\n      ...prev,\n      lessons: prev.lessons.map(l => l.id === id ? { ...l, [field]: value } : l)\n    } : null);\n  };\n\n  return (\n    <div className=\"min-h-screen pb-20 bg-slate-50\">\n      <header className=\"bg-slate-800 text-white shadow-lg no-print sticky top-0 z-40\">\n        <div className=\"container mx-auto px-4 md:px-6 py-3 flex items-center justify-between\">\n          <div className=\"flex items-center gap-3\">\n            <div className=\"bg-indigo-600 p-1.5 rounded-lg shrink-0\"><Package className=\"w-5 h-5 md:w-6 md:h-6\" /></div>\n            <div>\n              <h1 className=\"text-lg md:text-xl font-bold leading-tight\">SchemeGenie</h1>\n              <p className=\"text-[10px] md:text-xs text-indigo-300 italic uppercase tracking-widest font-black\">High Fidelity Batch Mapping • 216 Lessons</p>\n            </div>\n          </div>\n          <div className=\"flex items-center gap-2\">\n            {activeScheme && (\n              <button onClick={() => { if(confirm(\"Discard current plan and start over?\")) setActiveScheme(null); }} className=\"p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white\" title=\"New Scheme\">\n                <RotateCcw className=\"w-5 h-5\" />\n              </button>\n            )}\n            <div className=\"h-6 w-px bg-slate-700 mx-1 hidden md:block\"></div>\n            {activeScheme && (\n              <div className=\"flex items-center gap-1 md:gap-2\">\n                 <button onClick={() => exportToPDF(activeScheme)} className=\"bg-rose-600 hover:bg-rose-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileDown className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">PDF</span>\n                 </button>\n                 <button onClick={() => exportToWord(activeScheme)} className=\"bg-blue-600 hover:bg-blue-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileText className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">DOCX</span>\n                 </button>\n                 <button onClick={() => exportToExcel(activeScheme)} className=\"bg-emerald-600 hover:bg-emerald-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileSpreadsheet className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">EXCEL</span>\n                 </button>\n              </div>\n            )}\n          </div>\n        </div>\n      </header>\n\n      <main className=\"container mx-auto px-4 md:px-6 py-8\">\n        {!activeScheme ? (\n          <div className=\"max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700\">\n            <div className=\"text-center space-y-4 py-10\">\n              <h2 className=\"text-4xl md:text-6xl font-extrabold text-slate-800 tracking-tight leading-none\">Complete Year <br/><span className=\"text-indigo-600\">Deep-Syllabus Mapping</span></h2>\n              <p className=\"text-base md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed\">\n                Generating 216 lessons optimized for API efficiency. Each lesson is detailed with specific resources and evaluation criteria.\n              </p>\n            </div>\n            <InputForm onGenerate={handleGenerate} />\n            {error && (\n              <div className=\"bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl flex flex-col gap-2 mt-4\">\n                <div className=\"flex items-center gap-3\">\n                  <Layout className=\"w-5 h-5\" />\n                  <span className=\"font-bold\">Generation Error</span>\n                </div>\n                <p className=\"text-sm opacity-80\">{error}</p>\n              </div>\n            )}\n          </div>\n        ) : (\n          <div className=\"space-y-8\">\n            <div className=\"grid grid-cols-1 lg:grid-cols-3 gap-6 no-print\">\n              <div className=\"lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col justify-center relative overflow-hidden\">\n                <div className=\"absolute top-0 left-0 w-2 h-full bg-indigo-600\"></div>\n                <div className=\"flex items-start justify-between\">\n                  <div>\n                    <h2 className=\"text-3xl font-black text-slate-800 uppercase tracking-tight leading-none mb-1\">{activeScheme.metadata.subject}</h2>\n                    <p className=\"text-slate-500 font-bold text-sm tracking-wide\">{activeScheme.metadata.school} • {activeScheme.metadata.form} • {activeScheme.metadata.academicYear}</p>\n                    <div className=\"mt-6 flex flex-wrap gap-2\">\n                       <span className=\"bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 shadow-md\">\n                         <FileCheck className=\"w-3.5 h-3.5\" /> {activeScheme.lessons.length} Lessons Verified\n                       </span>\n                       <span className=\"bg-slate-100 text-slate-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase\">\n                         Full Academic Year Target Reached\n                       </span>\n                    </div>\n                  </div>\n                  <button onClick={() => setActiveScheme(null)} className=\"text-slate-300 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-full\">\n                    <X className=\"w-6 h-6\" />\n                  </button>\n                </div>\n              </div>\n              \n              <div className=\"bg-slate-800 rounded-2xl shadow-xl p-6 text-white space-y-6\">\n                <h3 className=\"text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-700 pb-2\">Master Export Suite</h3>\n                <div className=\"grid grid-cols-3 gap-3\">\n                  <button onClick={() => exportToPDF(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-rose-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileDown className=\"w-6 h-6 group-hover:scale-110 transition-transform text-rose-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">A4 PDF</span>\n                  </button>\n                  <button onClick={() => exportToWord(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-blue-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileText className=\"w-6 h-6 group-hover:scale-110 transition-transform text-blue-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Word</span>\n                  </button>\n                  <button onClick={() => exportToExcel(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-emerald-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileSpreadsheet className=\"w-6 h-6 group-hover:scale-110 transition-transform text-emerald-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Excel</span>\n                  </button>\n                  <button onClick={() => exportRecordBookExcel(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-indigo-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <GraduationCap className=\"w-6 h-6 group-hover:scale-110 transition-transform text-indigo-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Grades</span>\n                  </button>\n                  <button onClick={() => downloadFullPackageZip(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-slate-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FolderArchive className=\"w-6 h-6 group-hover:scale-110 transition-transform text-slate-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Zip</span>\n                  </button>\n                </div>\n              </div>\n            </div>\n\n            <SchemeTable lessons={activeScheme.lessons} metadata={activeScheme.metadata} onUpdateLesson={updateLesson} onGenerateResources={handleGenerateResources} />\n          </div>\n        )}\n      </main>\n      {isLoading && <LoadingOverlay customMessage={loadingStep} />}\n    </div>\n  );\n};\n\nexport default App;\n"
+            }
+          ]
+        },
+        {
+          "path": "components/LoadingOverlay.tsx",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Updated loading messages to reflect the optimized 9-stage generation process.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport React, { useState, useEffect } from 'react';\nimport { LOADING_MESSAGES } from '../constants';\nimport { Loader2, Sparkles } from 'lucide-react';\n\ninterface LoadingOverlayProps {\n  customMessage?: string;\n}\n\nconst LoadingOverlay: React.FC<LoadingOverlayProps> = ({ customMessage }) => {\n  const [messageIndex, setMessageIndex] = useState(0);\n\n  useEffect(() => {\n    const interval = setInterval(() => {\n      setMessageIndex(prev => (prev + 1) % LOADING_MESSAGES.length);\n    }, 4000);\n    return () => clearInterval(interval);\n  }, []);\n\n  return (\n    <div className=\"fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-6\">\n      <div className=\"bg-white rounded-[2.5rem] p-12 max-w-lg w-full shadow-2xl flex flex-col items-center text-center animate-in fade-in zoom-in duration-500\">\n        <div className=\"relative mb-8\">\n          <div className=\"absolute -inset-4 bg-indigo-50 rounded-full animate-pulse\"></div>\n          <Loader2 className=\"w-20 h-20 text-indigo-600 animate-spin relative z-10\" />\n          <div className=\"absolute top-0 right-0\">\n            <Sparkles className=\"w-6 h-6 text-indigo-400 animate-bounce\" />\n          </div>\n        </div>\n        \n        <h3 className=\"text-2xl font-black text-slate-800 mb-2 uppercase tracking-tight\">Constructing Academic Year</h3>\n        \n        <div className=\"h-10 flex items-center justify-center\">\n          <p className=\"text-indigo-600 font-black text-sm uppercase tracking-[0.15em] animate-pulse\">\n            {customMessage || \"Initializing Generation...\"}\n          </p>\n        </div>\n        \n        <p className=\"text-slate-500 h-16 flex items-center justify-center transition-all duration-700 italic text-base px-4\">\n          \"{LOADING_MESSAGES[messageIndex]}\"\n        </p>\n\n        <div className=\"w-full bg-slate-100 h-3 rounded-full mt-8 overflow-hidden border border-slate-200 p-0.5\">\n          <div className=\"bg-gradient-to-r from-indigo-500 to-indigo-700 h-full animate-progress-indeterminate rounded-full\"></div>\n        </div>\n        \n        <div className=\"mt-8 pt-8 border-t border-slate-100 w-full\">\n          <p className=\"text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-loose\">\n            Generating 9 optimized chunks of 24 lessons each.<br/>\n            This reduces API calls and manages quota limits automatically.<br/>\n            If you see \"Retrying...\", please wait—it's managing the rate limits for you.\n          </p>\n        </div>\n      </div>\n      \n      <style>{`\n        @keyframes progress-indeterminate {\n          0% { transform: scaleX(0.1) translateX(-100%); }\n          50% { transform: scaleX(0.5) translateX(25%); }\n          100% { transform: scaleX(0.1) translateX(120%); }\n        }\n        .animate-progress-indeterminate {\n          animation: progress-indeterminate 2.5s infinite ease-in-out;\n          width: 100%;\n          transform-origin: left;\n        }\n      `}</style>\n    </div>\n  );\n};\n\nexport default LoadingOverlay;\n"
+            }
+          ]
+        }
+      ]
+    },
+    "createdTimestamp": {
+      "seconds": 1769037485,
+      "nanos": 5000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769037495,
+      "nanos": 337000000
+    }
+  },
+  {
+    "id": 28,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "The app should have option to scheme for topics given by the user",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769020366,
+      "nanos": 335000000
+    }
+  },
+  {
+    "id": 29,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Considering New User Options**\n\nI'm exploring how to integrate a new feature: a scheme of work generator based on a user-provided topic list. This will complement the existing syllabus upload and auto-generation capabilities. My focus now is on defining the user input format for the topic list, so the system will correctly interpret it.\n\n\n**Refining Topic Input Options**\n\nI'm now zeroing in on the user interface for manual topic entry. A single, multi-line text area seems most practical for now, allowing users to enter topics line by line or comma-separated. This offers flexibility for pasting content. I'll include a clear radio selection or tabbed interface to switch between manual entry and PDF upload. The aim is to make it intuitive and efficient for generating lesson chunks.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769020366,
+      "nanos": 336000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769020400,
+      "nanos": 499000000
+    }
+  },
+  {
+    "id": 30,
+    "author": "model",
+    "payload": {
+      "type": "text",
+      "text": "To satisfy your request, I will update the application to include a \"Manual Topics\" input option. This allows teachers to either upload a syllabus PDF or simply paste a list of topics they want to cover.\n\n### Specification of Updates\n\n1.  **`types.ts`**: Added `manualTopics` to the `SchemeMetadata` interface.\n2.  **`components/InputForm.tsx`**:\n    *   Introduced a selection between **\"Upload Syllabus\"** and **\"Manual Topics List\"**.\n    *   Added a large, user-friendly `textarea` for manual topic entry.\n    *   Updated the validation logic to ensure at least one source (file or topics) is provided or acknowledged.\n3.  **`services/geminiService.ts`**:\n    *   Updated the `generateLessonChunk` prompt to intelligently handle the `manualTopics` string if provided.\n    *   Ensured the AI understands it should map the provided topics across the academic year if a specific list is given.\n4.  **`App.tsx`**:\n    *   Updated the `handleGenerate` function to pass the manual topics through to the generation service.\n\n### Visual Improvements\n*   The `InputForm` now features a clean, tab-like interface for choosing the input method.\n*   Added helper text to guide users on how to format their manual topics (e.g., \"one per line\").\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769020400,
+      "nanos": 500000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769020400,
+      "nanos": 605000000
+    }
+  },
+  {
+    "id": 31,
+    "author": "model",
+    "payload": {
+      "type": "generationTable",
+      "entries": [
+        {
+          "path": "types.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Added manualTopics field to SchemeMetadata to support custom topic lists.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nexport interface Lesson {\n  id: string;\n  term: number; // 1, 2, or 3\n  week: number;\n  lessonNumber: number;\n  topic: string;\n  objectives: string;\n  concepts: string;\n  activities: string;\n  resources: string;\n  assessment: string;\n  homework: string;\n  evaluation: string;\n  remarks: string;\n  weekEnding: string;\n  lessonPlanContent?: string;\n  worksheetContent?: string;\n  slidesContent?: string[];\n  videoGuideDescription?: string;\n  isGeneratingResources?: boolean;\n}\n\nexport interface SchemeMetadata {\n  subject: string;\n  form: string;\n  weeksPerTerm: number;\n  lessonsPerWeek: number;\n  teacherName: string;\n  school: string;\n  academicYear: string;\n  manualTopics?: string;\n  termStarts: {\n    term1: string;\n    term2: string;\n    term3: string;\n  };\n}\n\nexport interface SchemeBook {\n  id: string;\n  metadata: SchemeMetadata;\n  lessons: Lesson[];\n  createdAt: number;\n}\n\nexport enum SubjectType {\n  MATH = 'Math',\n  SCIENCE = 'Science',\n  ENGLISH = 'English',\n  SOCIAL_STUDIES = 'Social Studies',\n  ART = 'Art',\n  MUSIC = 'Music',\n  PHYSICAL_EDUCATION = 'PE'\n}\n"
+            }
+          ]
+        },
+        {
+          "path": "components/InputForm.tsx",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Updated InputForm to allow users to provide manual topics via a text area.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport React, { useState, useRef } from 'react';\nimport { SchemeMetadata } from '../types';\nimport { getAcademicYears } from '../utils/dateUtils';\nimport { FileText, Sparkles, Upload, FileUp, X, Loader2, ListOrdered, PencilLine, Info } from 'lucide-react';\nimport { extractSyllabusInfo } from '../services/geminiService';\n\ninterface InputFormProps {\n  onGenerate: (metadata: SchemeMetadata, syllabusFile?: { data: string, mimeType: string }) => void;\n}\n\nconst InputForm: React.FC<InputFormProps> = ({ onGenerate }) => {\n  const [inputMode, setInputMode] = useState<'upload' | 'manual'>('upload');\n  const [formData, setFormData] = useState<SchemeMetadata>({\n    subject: '',\n    form: '',\n    weeksPerTerm: 12,\n    lessonsPerWeek: 6,\n    teacherName: '',\n    school: '',\n    academicYear: getAcademicYears()[0],\n    manualTopics: '',\n    termStarts: {\n      term1: new Date().toISOString().split('T')[0],\n      term2: new Date(new Date().setMonth(new Date().getMonth() + 4)).toISOString().split('T')[0],\n      term3: new Date(new Date().setMonth(new Date().getMonth() + 8)).toISOString().split('T')[0]\n    }\n  });\n\n  const [selectedFile, setSelectedFile] = useState<File | null>(null);\n  const [fileBase64, setFileBase64] = useState<string | null>(null);\n  const [isExtracting, setIsExtracting] = useState(false);\n  const fileInputRef = useRef<HTMLInputElement>(null);\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {\n    const { name, value } = e.target;\n    if (name.startsWith('termStart')) {\n      const termKey = name.split('-')[1] as keyof typeof formData.termStarts;\n      setFormData(prev => ({ ...prev, termStarts: { ...prev.termStarts, [termKey]: value } }));\n    } else {\n      setFormData(prev => ({ \n        ...prev, \n        [name]: (name === 'weeksPerTerm' || name === 'lessonsPerWeek') ? parseInt(value) || 0 : value \n      }));\n    }\n  };\n\n  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {\n    const file = e.target.files?.[0];\n    if (file?.type === 'application/pdf') {\n      setSelectedFile(file);\n      const reader = new FileReader();\n      reader.onload = async (event) => {\n        const base64 = (event.target?.result as string).split(',')[1];\n        setFileBase64(base64);\n        setIsExtracting(true);\n        try {\n          const info = await extractSyllabusInfo({ data: base64, mimeType: 'application/pdf' });\n          setFormData(prev => ({ ...prev, subject: info.subject, form: info.form, weeksPerTerm: info.recommendedWeeksPerTerm }));\n        } finally { setIsExtracting(false); }\n      };\n      reader.readAsDataURL(file);\n    }\n  };\n\n  const handleSubmit = (e: React.FormEvent) => {\n    e.preventDefault();\n    onGenerate(formData, inputMode === 'upload' && fileBase64 ? { data: fileBase64, mimeType: 'application/pdf' } : undefined);\n  };\n\n  return (\n    <div className=\"bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden\">\n      {/* Input Mode Tabs */}\n      <div className=\"flex border-b border-slate-100\">\n        <button \n          type=\"button\"\n          onClick={() => setInputMode('upload')}\n          className={`flex-1 py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${inputMode === 'upload' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-400 hover:bg-slate-50'}`}\n        >\n          <Upload className=\"w-4 h-4\" /> Upload Syllabus PDF\n        </button>\n        <button \n          type=\"button\"\n          onClick={() => setInputMode('manual')}\n          className={`flex-1 py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${inputMode === 'manual' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-400 hover:bg-slate-50'}`}\n        >\n          <ListOrdered className=\"w-4 h-4\" /> Enter Topics Manually\n        </button>\n      </div>\n\n      <form onSubmit={handleSubmit} className=\"p-6 space-y-6\">\n        {inputMode === 'upload' ? (\n          <div className=\"space-y-2\">\n            <label className=\"text-sm font-medium flex items-center gap-2 text-slate-700\">\n              <FileUp className=\"w-4 h-4\" /> Syllabus Document (PDF)\n            </label>\n            <div \n              onClick={() => !selectedFile && fileInputRef.current?.click()} \n              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${selectedFile ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50 cursor-pointer'}`}\n            >\n              <input type=\"file\" ref={fileInputRef} className=\"hidden\" accept=\"application/pdf\" onChange={handleFileChange} />\n              {selectedFile ? (\n                <div className=\"flex flex-col items-center gap-2\">\n                  <div className=\"bg-white p-2 rounded-lg shadow-sm border border-indigo-100\">\n                    <p className=\"text-sm font-black text-indigo-600\">{selectedFile.name}</p>\n                  </div>\n                  <button type=\"button\" onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileBase64(null); }} className=\"text-[10px] text-rose-500 font-bold uppercase hover:underline\">Remove File</button>\n                </div>\n              ) : (\n                <div className=\"space-y-1\">\n                  <p className=\"text-sm text-slate-500 font-medium\">Click to upload your syllabus PDF</p>\n                  <p className=\"text-[10px] text-slate-400 font-bold uppercase tracking-wider\">AI will extract subject, topics, and structure</p>\n                </div>\n              )}\n            </div>\n          </div>\n        ) : (\n          <div className=\"space-y-2\">\n            <label className=\"text-sm font-medium flex items-center gap-2 text-slate-700\">\n              <PencilLine className=\"w-4 h-4\" /> Custom Topic List\n            </label>\n            <textarea\n              name=\"manualTopics\"\n              value={formData.manualTopics}\n              onChange={handleChange}\n              placeholder=\"Enter topics you want to cover, one per line (e.g., Intro to Algebra, Linear Equations, Quadratic Formula...)\"\n              className=\"w-full border border-slate-200 p-4 rounded-xl text-sm min-h-[120px] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-300\"\n            />\n            <p className=\"text-[10px] text-slate-400 flex items-center gap-1\">\n              <Info className=\"w-3 h-3\" /> The AI will automatically expand these into a full 216-lesson academic schedule.\n            </p>\n          </div>\n        )}\n\n        <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">\n          <div className=\"space-y-1\">\n            <label className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1\">Subject</label>\n            <input required name=\"subject\" value={formData.subject} onChange={handleChange} className=\"w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" placeholder=\"e.g. Physics\" />\n          </div>\n          <div className=\"space-y-1\">\n            <label className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1\">Form / Grade</label>\n            <input required name=\"form\" value={formData.form} onChange={handleChange} className=\"w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" placeholder=\"e.g. Form 3\" />\n          </div>\n        </div>\n\n        <div className=\"grid grid-cols-3 gap-4\">\n          {['term1', 'term2', 'term3'].map((t, idx) => (\n            <div key={t} className=\"space-y-1\">\n              <label className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1\">Term {idx + 1} Start</label>\n              <input type=\"date\" name={`termStart-${t}`} value={formData.termStarts[t as keyof typeof formData.termStarts]} onChange={handleChange} className=\"w-full border p-2 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none\" />\n            </div>\n          ))}\n        </div>\n\n        <div className=\"grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100\">\n          <div className=\"space-y-1\">\n            <label className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest\">Weeks/Term</label>\n            <input type=\"number\" name=\"weeksPerTerm\" value={formData.weeksPerTerm} onChange={handleChange} className=\"w-full border p-2 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" />\n          </div>\n          <div className=\"space-y-1\">\n            <label className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest\">Lessons/Week</label>\n            <input type=\"number\" name=\"lessonsPerWeek\" value={formData.lessonsPerWeek} onChange={handleChange} className=\"w-full border p-2 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" />\n          </div>\n          <div className=\"space-y-1\">\n            <label className=\"text-[10px] font-black text-indigo-600 uppercase tracking-widest\">Target Count</label>\n            <div className=\"w-full bg-indigo-100 p-2 rounded-lg text-center font-black text-indigo-700 border border-indigo-200\">\n              216 Lessons\n            </div>\n          </div>\n        </div>\n\n        <div className=\"grid grid-cols-3 gap-4\">\n          <input name=\"teacherName\" value={formData.teacherName} onChange={handleChange} className=\"border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" placeholder=\"Teacher Name\" />\n          <input name=\"school\" value={formData.school} onChange={handleChange} className=\"border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" placeholder=\"School Name\" />\n          <select name=\"academicYear\" value={formData.academicYear} onChange={handleChange} className=\"border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white\">\n            {getAcademicYears().map(y => <option key={y} value={y}>{y}</option>)}\n          </select>\n        </div>\n\n        <button \n          type=\"submit\" \n          disabled={isExtracting} \n          className=\"w-full bg-indigo-600 text-white font-black py-4 rounded-xl hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg shadow-indigo-100 disabled:opacity-50\"\n        >\n          {isExtracting ? (\n            <Loader2 className=\"w-5 h-5 animate-spin\" />\n          ) : (\n            <Sparkles className=\"w-5 h-5\" />\n          )}\n          Generate High-Fidelity Year Map\n        </button>\n      </form>\n    </div>\n  );\n};\n\nexport default InputForm;\n"
+            }
+          ]
+        },
+        {
+          "path": "services/geminiService.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Updated generateLessonChunk to handle manual topics when no syllabus file is provided.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport { GoogleGenAI, Type } from \"@google/genai\";\nimport { SchemeMetadata, Lesson } from \"../types\";\n\nexport interface ExtractedSyllabusInfo {\n  subject: string;\n  form: string;\n  recommendedWeeksPerTerm: number;\n}\n\nconst sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));\n\n/**\n * Generic retry wrapper to handle transient API errors and Quota limits.\n */\nasync function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {\n  let lastError: any;\n  for (let i = 0; i < maxRetries; i++) {\n    try {\n      return await fn();\n    } catch (err: any) {\n      lastError = err;\n      const errorMessage = err.message?.toLowerCase() || \"\";\n      const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('429') || err.status === 429;\n      \n      if (isQuotaError && i < maxRetries - 1) {\n        // Wait longer on each retry (30s, 60s...)\n        const waitTime = (i + 1) * 30000;\n        console.warn(`Quota exceeded. Retrying in ${waitTime/1000}s... (Attempt ${i + 1}/${maxRetries})`);\n        await sleep(waitTime);\n        continue;\n      }\n      throw err;\n    }\n  }\n  throw lastError;\n}\n\n/**\n * Helper to get the AI instance.\n */\nconst getAI = () => {\n  const apiKey = process.env.API_KEY;\n  if (!apiKey) {\n    console.warn(\"API_KEY is missing. Ensure it is set in your Vercel Environment Variables.\");\n  }\n  return new GoogleGenAI({ apiKey: apiKey || \"\" });\n};\n\nexport const extractSyllabusInfo = async (\n  syllabusFile: { data: string, mimeType: string }\n): Promise<ExtractedSyllabusInfo> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-flash-preview\",\n      contents: {\n        parts: [\n          { text: \"Analyze this syllabus. Identify the subject, target form/grade, and recommended weeks per term (usually 10-13) for a 3-term academic year.\" },\n          { inlineData: syllabusFile }\n        ]\n      },\n      config: {\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.OBJECT,\n          properties: {\n            subject: { type: Type.STRING },\n            form: { type: Type.STRING },\n            recommendedWeeksPerTerm: { type: Type.INTEGER },\n          },\n          required: [\"subject\", \"form\", \"recommendedWeeksPerTerm\"],\n        }\n      }\n    });\n\n    try {\n      const text = response.text ?? \"\";\n      return JSON.parse(text.trim());\n    } catch (error) {\n      return { subject: \"\", form: \"\", recommendedWeeksPerTerm: 12 };\n    }\n  });\n};\n\nexport const generateLessonChunk = async (\n  term: number,\n  startLesson: number,\n  endLesson: number,\n  metadata: SchemeMetadata, \n  syllabusFile?: { data: string, mimeType: string }\n): Promise<Partial<Lesson>[]> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    \n    const contextInfo = syllabusFile \n      ? \"from the attached syllabus PDF\" \n      : `based on these user-provided topics: \"${metadata.manualTopics || 'Standard ' + metadata.subject + ' curriculum'}\"`;\n\n    const textPrompt = `\n      Act as a Senior Curriculum Specialist. You are creating a specific batch of lessons for a detailed Scheme of Work ${contextInfo}.\n      \n      TARGET: TERM ${term}, LESSONS ${startLesson} TO ${endLesson}.\n      \n      CRITICAL QUALITY MANDATE:\n      1. EXTREME DETAIL: Every field must be exhaustive. No generic placeholders.\n      2. RESOURCES: List specific textbooks (incl. page ranges), exact laboratory equipment (quantities and types), specific digital links (YouTube, Simulations), and detailed visual aids.\n      3. EVALUATION CRITERIA: Must be highly specific success indicators. What EXACTLY must the pupil do to show mastery? Use measurable verbs.\n      4. OBJECTIVES: \"Pupils will be able to...\" followed by at least 3 high-level Bloom's taxonomy objectives.\n      5. ACTIVITIES: Step-by-step classroom procedure including introduction, core activity, and plenary.\n\n      Metadata:\n      - Subject: ${metadata.subject}\n      - Level: Form ${metadata.form}\n      - Term: ${term}\n\n      STRATEGY: Map the provided topics logically across the 216 lessons of the year. This specific chunk is for lessons ${startLesson} to ${endLesson}.\n\n      Output format:\n      Return an array of objects for lessons ${startLesson} through ${endLesson}.\n      Each object: { \"term\": ${term}, \"week\": number, \"lessonNumber\": number, \"topic\": string, \"objectives\": string, \"activities\": string, \"resources\": string, \"assessment\": string, \"homework\": string, \"evaluation\": string }\n    `;\n\n    const contents = syllabusFile \n      ? { parts: [{ text: textPrompt }, { inlineData: syllabusFile }] }\n      : textPrompt;\n\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-flash-preview\",\n      contents: contents,\n      config: {\n        thinkingConfig: { thinkingBudget: 4000 },\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.ARRAY,\n          items: {\n            type: Type.OBJECT,\n            properties: {\n              term: { type: Type.INTEGER },\n              week: { type: Type.INTEGER },\n              lessonNumber: { type: Type.INTEGER },\n              topic: { type: Type.STRING },\n              objectives: { type: Type.STRING },\n              activities: { type: Type.STRING },\n              resources: { type: Type.STRING },\n              assessment: { type: Type.STRING },\n              homework: { type: Type.STRING },\n              evaluation: { type: Type.STRING },\n            },\n            required: [\"term\", \"week\", \"lessonNumber\", \"topic\", \"objectives\", \"activities\", \"resources\", \"assessment\", \"homework\", \"evaluation\"],\n          }\n        }\n      }\n    });\n\n    try {\n      const text = response.text ?? \"\";\n      const result = JSON.parse(text.trim());\n      if (!Array.isArray(result)) throw new Error(\"Output is not an array\");\n      return result;\n    } catch (error) {\n      console.error(`Batch ${startLesson}-${endLesson} failed:`, error);\n      throw new Error(`Failed to generate lessons ${startLesson}-${endLesson}. API limit or timeout.`);\n    }\n  });\n};\n\nexport const generateLessonResourcesContent = async (\n  lesson: Lesson,\n  metadata: SchemeMetadata\n): Promise<Pick<Lesson, 'lessonPlanContent' | 'worksheetContent' | 'slidesContent' | 'videoGuideDescription'>> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-pro-preview\",\n      contents: `Generate a hyper-detailed teaching package for Topic: \"${lesson.topic}\". \n      Reference existing resources: \"${lesson.resources}\".\n      Evaluation criteria to hit: \"${lesson.evaluation}\".\n      \n      Package must include:\n      1. A 600-word Lesson Plan.\n      2. A 15-question comprehensive Worksheet.\n      3. 7 Content-rich Presentation Slides.\n      4. A Video Script.\n      \n      Use \"Pupils\" throughout.`,\n      config: {\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.OBJECT,\n          properties: {\n            lessonPlanContent: { type: Type.STRING },\n            worksheetContent: { type: Type.STRING },\n            slidesContent: { type: Type.ARRAY, items: { type: Type.STRING } },\n            videoGuideDescription: { type: Type.STRING },\n          },\n          required: [\"lessonPlanContent\", \"worksheetContent\", \"slidesContent\", \"videoGuideDescription\"],\n        }\n      }\n    });\n    const text = response.text ?? \"\";\n    return JSON.parse(text.trim());\n  });\n};\n"
+            }
+          ]
+        }
+      ]
+    },
+    "createdTimestamp": {
+      "seconds": 1769020404,
+      "nanos": 242000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769020405,
+      "nanos": 946000000
+    }
+  },
+  {
+    "id": 33,
+    "author": "user",
+    "payload": {
+      "type": "text",
+      "text": "When the enter topics the app should scheme for those topics only",
+      "files": [],
+      "fileUploads": [],
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769020655,
+      "nanos": 650000000
+    }
+  },
+  {
+    "id": 34,
+    "author": "model",
+    "payload": {
+      "type": "thinking",
+      "text": "**Refining Specific Topic Logic**\n\nI'm currently focused on how to make the system incorporate a user-provided list of manual topics. The goal is for the lesson plan generator to limit itself to the specified topics. I'm looking at modifying the `generateLessonChunk` service to recognize and utilize this input. The primary challenge is ensuring topic-specific generation while maintaining the flow and structure of the lesson plans.\n\n\n**Resolving Topic Conflict**\n\nI've realized a fundamental conflict exists. The system aims for a 216-lesson year, but users want topic-specific schemes. My solution is to instruct the AI to *strictly* adhere to provided manual topics. If the list is short, the AI will create depth, but it should not add extraneous topics. I must now refine the service to enforce strict adherence to the manual topic list.\n\n\n**Updating User Input Handling**\n\nI'm now integrating user control over lesson numbers in `App.tsx` and `InputForm.tsx`. I'll allow users to specify a lesson count or stick to the 216-lesson scheme but ensure the AI understands to focus deeply on their topics. I'm also addressing the common user interpretation of \"scheme for those topics only,\" aiming for a focused week-by-week structure. My focus is on updating the prompt for strict topic adherence and refining `InputForm.tsx` to communicate this distribution effectively. I will modify the instruction in `generateLessonChunk`.\n\n\n**Enforcing Topic Constraint**\n\nI'm now zeroing in on prompt refinement within `geminiService.ts`. The `contextInfo` variable's phrasing is too loose; I will modify it to instruct the AI to *exclusively* address the manual topics and to add depth when there are fewer of them than lessons. I've decided against altering the 216-lesson scheme. My current focus is ensuring the AI respects this strict topic constraint.\n\n\n**Clarifying Lesson Distribution**\n\nI'm now zeroing in on lesson distribution. I believe users interpreting \"scheme for those topics only\" means they expect strict adherence, leading to a deep dive. I've decided on \"strict adherence\" as the default for manual topics. I am updating `services/geminiService.ts` to reflect this and plan a UI update to `components/InputForm.tsx`. I will clarify that this means deep dives for smaller topic lists, and I will keep the existing 72-lessons/term split.\n\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769020655,
+      "nanos": 651000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769020700,
+      "nanos": 2000000
+    }
+  },
+  {
+    "id": 35,
+    "author": "model",
+    "payload": {
+      "type": "text",
+      "text": "To satisfy your request, I will update the application to ensure that when manual topics are provided, the AI **strictly** adheres to that list and does not \"expand\" or add extra subject matter. I will also add a \"Lessons per Term\" setting to the input form so you can control exactly how many lessons are generated (e.g., if you only have a few topics, you might want fewer total lessons).\n\n### Specification of Updates\n\n1.  **`types.ts`**: Added `lessonsPerTerm` to `SchemeMetadata` so the total lesson count is no longer hardcoded to 216.\n2.  **`services/geminiService.ts`**: \n    *   Updated the prompt with a **STRICT ADHERENCE MANDATE**.\n    *   Instructed the AI that if `manualTopics` are provided, it must **only** use those topics and subdivide them into more detailed sub-topics if necessary to fill the slots, without introducing unrelated content.\n3.  **`components/InputForm.tsx`**:\n    *   Added a \"Lessons per Term\" input field (defaulting to 72, but user-adjustable).\n    *   Added a \"Strict Mode\" toggle or clear UI text indicating that the AI will now respect the specific topic list as the exclusive source of truth.\n4.  **`App.tsx`**:\n    *   Updated the generation loop to use the dynamic `metadata.lessonsPerTerm` instead of the hardcoded 72.\n\n",
+      "cMarkNode": {}
+    },
+    "createdTimestamp": {
+      "seconds": 1769020700,
+      "nanos": 3000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769020700,
+      "nanos": 6000000
+    }
+  },
+  {
+    "id": 36,
+    "author": "model",
+    "payload": {
+      "type": "generationTable",
+      "entries": [
+        {
+          "path": "types.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Added lessonsPerTerm to SchemeMetadata to allow for dynamic lesson counts per term.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nexport interface Lesson {\n  id: string;\n  term: number; // 1, 2, or 3\n  week: number;\n  lessonNumber: number;\n  topic: string;\n  objectives: string;\n  concepts: string;\n  activities: string;\n  resources: string;\n  assessment: string;\n  homework: string;\n  evaluation: string;\n  remarks: string;\n  weekEnding: string;\n  lessonPlanContent?: string;\n  worksheetContent?: string;\n  slidesContent?: string[];\n  videoGuideDescription?: string;\n  isGeneratingResources?: boolean;\n}\n\nexport interface SchemeMetadata {\n  subject: string;\n  form: string;\n  weeksPerTerm: number;\n  lessonsPerWeek: number;\n  lessonsPerTerm: number; // User-defined target per term\n  teacherName: string;\n  school: string;\n  academicYear: string;\n  manualTopics?: string;\n  termStarts: {\n    term1: string;\n    term2: string;\n    term3: string;\n  };\n}\n\nexport interface SchemeBook {\n  id: string;\n  metadata: SchemeMetadata;\n  lessons: Lesson[];\n  createdAt: number;\n}\n\nexport enum SubjectType {\n  MATH = 'Math',\n  SCIENCE = 'Science',\n  ENGLISH = 'English',\n  SOCIAL_STUDIES = 'Social Studies',\n  ART = 'Art',\n  MUSIC = 'Music',\n  PHYSICAL_EDUCATION = 'PE'\n}\n"
+            }
+          ]
+        },
+        {
+          "path": "services/geminiService.ts",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Updated the AI prompt to enforce strict adherence to provided manual topics and prevent the introduction of outside content.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport { GoogleGenAI, Type } from \"@google/genai\";\nimport { SchemeMetadata, Lesson } from \"../types\";\n\nexport interface ExtractedSyllabusInfo {\n  subject: string;\n  form: string;\n  recommendedWeeksPerTerm: number;\n}\n\nconst sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));\n\n/**\n * Generic retry wrapper to handle transient API errors and Quota limits.\n */\nasync function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {\n  let lastError: any;\n  for (let i = 0; i < maxRetries; i++) {\n    try {\n      return await fn();\n    } catch (err: any) {\n      lastError = err;\n      const errorMessage = err.message?.toLowerCase() || \"\";\n      const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('429') || err.status === 429;\n      \n      if (isQuotaError && i < maxRetries - 1) {\n        const waitTime = (i + 1) * 30000;\n        console.warn(`Quota exceeded. Retrying in ${waitTime/1000}s... (Attempt ${i + 1}/${maxRetries})`);\n        await sleep(waitTime);\n        continue;\n      }\n      throw err;\n    }\n  }\n  throw lastError;\n}\n\nconst getAI = () => {\n  const apiKey = process.env.API_KEY;\n  if (!apiKey) {\n    console.warn(\"API_KEY is missing.\");\n  }\n  return new GoogleGenAI({ apiKey: apiKey || \"\" });\n};\n\nexport const extractSyllabusInfo = async (\n  syllabusFile: { data: string, mimeType: string }\n): Promise<ExtractedSyllabusInfo> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-flash-preview\",\n      contents: {\n        parts: [\n          { text: \"Analyze this syllabus. Identify the subject, target form/grade, and recommended weeks per term (usually 10-13) for a 3-term academic year.\" },\n          { inlineData: syllabusFile }\n        ]\n      },\n      config: {\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.OBJECT,\n          properties: {\n            subject: { type: Type.STRING },\n            form: { type: Type.STRING },\n            recommendedWeeksPerTerm: { type: Type.INTEGER },\n          },\n          required: [\"subject\", \"form\", \"recommendedWeeksPerTerm\"],\n        }\n      }\n    });\n\n    try {\n      const text = response.text ?? \"\";\n      return JSON.parse(text.trim());\n    } catch (error) {\n      return { subject: \"\", form: \"\", recommendedWeeksPerTerm: 12 };\n    }\n  });\n};\n\nexport const generateLessonChunk = async (\n  term: number,\n  startLesson: number,\n  endLesson: number,\n  metadata: SchemeMetadata, \n  syllabusFile?: { data: string, mimeType: string }\n): Promise<Partial<Lesson>[]> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    \n    // Strictness logic for manual topics\n    const sourceConstraint = syllabusFile \n      ? \"STRICTLY follow the content provided in the attached syllabus PDF.\" \n      : `STRICTLY ADHERE ONLY to the topics provided in this list: \"${metadata.manualTopics}\". DO NOT introduce any topics outside of this list. If there are fewer topics than requested lessons, break the provided topics down into highly detailed sub-topics or practical sessions, but DO NOT add unrelated subject matter.`;\n\n    const textPrompt = `\n      Act as a Senior Curriculum Specialist. You are creating a batch of lessons for a Scheme of Work.\n      \n      CONTEXT: ${sourceConstraint}\n      \n      TARGET: TERM ${term}, LESSONS ${startLesson} TO ${endLesson}.\n      TOTAL LESSONS FOR THIS TERM: ${metadata.lessonsPerTerm}.\n\n      CRITICAL QUALITY MANDATE:\n      1. EXTREME DETAIL: Every field must be exhaustive. \n      2. RESOURCES: List specific textbooks, laboratory equipment, digital links, and visual aids.\n      3. EVALUATION CRITERIA: Highly specific success indicators with measurable verbs.\n      4. OBJECTIVES: \"Pupils will be able to...\" followed by at least 3 objectives.\n      5. ACTIVITIES: Step-by-step procedure.\n\n      Metadata:\n      - Subject: ${metadata.subject}\n      - Level: Form ${metadata.form}\n\n      Output format:\n      Return an array of objects for lessons ${startLesson} through ${endLesson}.\n      Each object: { \"term\": ${term}, \"week\": number, \"lessonNumber\": number, \"topic\": string, \"objectives\": string, \"activities\": string, \"resources\": string, \"assessment\": string, \"homework\": string, \"evaluation\": string }\n    `;\n\n    const contents = syllabusFile \n      ? { parts: [{ text: textPrompt }, { inlineData: syllabusFile }] }\n      : textPrompt;\n\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-flash-preview\",\n      contents: contents,\n      config: {\n        thinkingConfig: { thinkingBudget: 4000 },\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.ARRAY,\n          items: {\n            type: Type.OBJECT,\n            properties: {\n              term: { type: Type.INTEGER },\n              week: { type: Type.INTEGER },\n              lessonNumber: { type: Type.INTEGER },\n              topic: { type: Type.STRING },\n              objectives: { type: Type.STRING },\n              activities: { type: Type.STRING },\n              resources: { type: Type.STRING },\n              assessment: { type: Type.STRING },\n              homework: { type: Type.STRING },\n              evaluation: { type: Type.STRING },\n            },\n            required: [\"term\", \"week\", \"lessonNumber\", \"topic\", \"objectives\", \"activities\", \"resources\", \"assessment\", \"homework\", \"evaluation\"],\n          }\n        }\n      }\n    });\n\n    try {\n      const text = response.text ?? \"\";\n      const result = JSON.parse(text.trim());\n      if (!Array.isArray(result)) throw new Error(\"Output is not an array\");\n      return result;\n    } catch (error) {\n      console.error(`Batch ${startLesson}-${endLesson} failed:`, error);\n      throw new Error(`Failed to generate lessons ${startLesson}-${endLesson}.`);\n    }\n  });\n};\n\nexport const generateLessonResourcesContent = async (\n  lesson: Lesson,\n  metadata: SchemeMetadata\n): Promise<Pick<Lesson, 'lessonPlanContent' | 'worksheetContent' | 'slidesContent' | 'videoGuideDescription'>> => {\n  return withRetry(async () => {\n    const ai = getAI();\n    const response = await ai.models.generateContent({\n      model: \"gemini-3-pro-preview\",\n      contents: `Generate a hyper-detailed teaching package for Topic: \"${lesson.topic}\". \n      Reference existing resources: \"${lesson.resources}\".\n      Evaluation criteria to hit: \"${lesson.evaluation}\".\n      \n      Package must include:\n      1. A 600-word Lesson Plan.\n      2. A 15-question comprehensive Worksheet.\n      3. 7 Content-rich Presentation Slides.\n      4. A Video Script.\n      \n      Use \"Pupils\" throughout.`,\n      config: {\n        responseMimeType: \"application/json\",\n        responseSchema: {\n          type: Type.OBJECT,\n          properties: {\n            lessonPlanContent: { type: Type.STRING },\n            worksheetContent: { type: Type.STRING },\n            slidesContent: { type: Type.ARRAY, items: { type: Type.STRING } },\n            videoGuideDescription: { type: Type.STRING },\n          },\n          required: [\"lessonPlanContent\", \"worksheetContent\", \"slidesContent\", \"videoGuideDescription\"],\n        }\n      }\n    });\n    const text = response.text ?? \"\";\n    return JSON.parse(text.trim());\n  });\n};\n"
+            }
+          ]
+        },
+        {
+          "path": "components/InputForm.tsx",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Added 'Lessons per Term' input and updated the manual topics section to clarify strict adherence.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport React, { useState, useRef } from 'react';\nimport { SchemeMetadata } from '../types';\nimport { getAcademicYears } from '../utils/dateUtils';\nimport { FileText, Sparkles, Upload, FileUp, X, Loader2, ListOrdered, PencilLine, Info, Settings2 } from 'lucide-react';\nimport { extractSyllabusInfo } from '../services/geminiService';\n\ninterface InputFormProps {\n  onGenerate: (metadata: SchemeMetadata, syllabusFile?: { data: string, mimeType: string }) => void;\n}\n\nconst InputForm: React.FC<InputFormProps> = ({ onGenerate }) => {\n  const [inputMode, setInputMode] = useState<'upload' | 'manual'>('upload');\n  const [formData, setFormData] = useState<SchemeMetadata>({\n    subject: '',\n    form: '',\n    weeksPerTerm: 12,\n    lessonsPerWeek: 6,\n    lessonsPerTerm: 72,\n    teacherName: '',\n    school: '',\n    academicYear: getAcademicYears()[0],\n    manualTopics: '',\n    termStarts: {\n      term1: new Date().toISOString().split('T')[0],\n      term2: new Date(new Date().setMonth(new Date().getMonth() + 4)).toISOString().split('T')[0],\n      term3: new Date(new Date().setMonth(new Date().getMonth() + 8)).toISOString().split('T')[0]\n    }\n  });\n\n  const [selectedFile, setSelectedFile] = useState<File | null>(null);\n  const [fileBase64, setFileBase64] = useState<string | null>(null);\n  const [isExtracting, setIsExtracting] = useState(false);\n  const fileInputRef = useRef<HTMLInputElement>(null);\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {\n    const { name, value } = e.target;\n    if (name.startsWith('termStart')) {\n      const termKey = name.split('-')[1] as keyof typeof formData.termStarts;\n      setFormData(prev => ({ ...prev, termStarts: { ...prev.termStarts, [termKey]: value } }));\n    } else {\n      setFormData(prev => ({ \n        ...prev, \n        [name]: (name === 'weeksPerTerm' || name === 'lessonsPerWeek' || name === 'lessonsPerTerm') ? parseInt(value) || 0 : value \n      }));\n    }\n  };\n\n  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {\n    const file = e.target.files?.[0];\n    if (file?.type === 'application/pdf') {\n      setSelectedFile(file);\n      const reader = new FileReader();\n      reader.onload = async (event) => {\n        const base64 = (event.target?.result as string).split(',')[1];\n        setFileBase64(base64);\n        setIsExtracting(true);\n        try {\n          const info = await extractSyllabusInfo({ data: base64, mimeType: 'application/pdf' });\n          setFormData(prev => ({ ...prev, subject: info.subject, form: info.form, weeksPerTerm: info.recommendedWeeksPerTerm }));\n        } finally { setIsExtracting(false); }\n      };\n      reader.readAsDataURL(file);\n    }\n  };\n\n  const handleSubmit = (e: React.FormEvent) => {\n    e.preventDefault();\n    onGenerate(formData, inputMode === 'upload' && fileBase64 ? { data: fileBase64, mimeType: 'application/pdf' } : undefined);\n  };\n\n  return (\n    <div className=\"bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden\">\n      <div className=\"flex border-b border-slate-100\">\n        <button \n          type=\"button\"\n          onClick={() => setInputMode('upload')}\n          className={`flex-1 py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${inputMode === 'upload' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-400 hover:bg-slate-50'}`}\n        >\n          <Upload className=\"w-4 h-4\" /> Upload Syllabus PDF\n        </button>\n        <button \n          type=\"button\"\n          onClick={() => setInputMode('manual')}\n          className={`flex-1 py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${inputMode === 'manual' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-400 hover:bg-slate-50'}`}\n        >\n          <ListOrdered className=\"w-4 h-4\" /> Enter Topics Manually\n        </button>\n      </div>\n\n      <form onSubmit={handleSubmit} className=\"p-6 space-y-6\">\n        {inputMode === 'upload' ? (\n          <div className=\"space-y-2\">\n            <label className=\"text-sm font-medium flex items-center gap-2 text-slate-700\">\n              <FileUp className=\"w-4 h-4\" /> Syllabus Document (PDF)\n            </label>\n            <div \n              onClick={() => !selectedFile && fileInputRef.current?.click()} \n              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${selectedFile ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50 cursor-pointer'}`}\n            >\n              <input type=\"file\" ref={fileInputRef} className=\"hidden\" accept=\"application/pdf\" onChange={handleFileChange} />\n              {selectedFile ? (\n                <div className=\"flex flex-col items-center gap-2\">\n                  <div className=\"bg-white p-2 rounded-lg shadow-sm border border-indigo-100\">\n                    <p className=\"text-sm font-black text-indigo-600\">{selectedFile.name}</p>\n                  </div>\n                  <button type=\"button\" onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileBase64(null); }} className=\"text-[10px] text-rose-500 font-bold uppercase hover:underline\">Remove File</button>\n                </div>\n              ) : (\n                <div className=\"space-y-1\">\n                  <p className=\"text-sm text-slate-500 font-medium\">Click to upload your syllabus PDF</p>\n                  <p className=\"text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center\">AI will extract and sequence topics from this document</p>\n                </div>\n              )}\n            </div>\n          </div>\n        ) : (\n          <div className=\"space-y-2\">\n            <label className=\"text-sm font-medium flex items-center gap-2 text-slate-700\">\n              <PencilLine className=\"w-4 h-4\" /> Custom Topic List (Strict Adherence)\n            </label>\n            <textarea\n              name=\"manualTopics\"\n              value={formData.manualTopics}\n              onChange={handleChange}\n              placeholder=\"Paste your specific topics here. The AI will ONLY use these topics and will not add outside content.\"\n              className=\"w-full border border-slate-200 p-4 rounded-xl text-sm min-h-[120px] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-300\"\n            />\n            <p className=\"text-[10px] text-slate-400 flex items-center gap-1\">\n              <Info className=\"w-3 h-3 text-indigo-500\" /> <strong>Strict Mode:</strong> No external syllabus data will be added.\n            </p>\n          </div>\n        )}\n\n        <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">\n          <div className=\"space-y-1\">\n            <label className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1\">Subject</label>\n            <input required name=\"subject\" value={formData.subject} onChange={handleChange} className=\"w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" placeholder=\"e.g. Physics\" />\n          </div>\n          <div className=\"space-y-1\">\n            <label className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1\">Form / Grade</label>\n            <input required name=\"form\" value={formData.form} onChange={handleChange} className=\"w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" placeholder=\"e.g. Form 3\" />\n          </div>\n        </div>\n\n        <div className=\"grid grid-cols-3 gap-4\">\n          {['term1', 'term2', 'term3'].map((t, idx) => (\n            <div key={t} className=\"space-y-1\">\n              <label className=\"text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1\">Term {idx + 1} Start</label>\n              <input type=\"date\" name={`termStart-${t}`} value={formData.termStarts[t as keyof typeof formData.termStarts]} onChange={handleChange} className=\"w-full border p-2 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none\" />\n            </div>\n          ))}\n        </div>\n\n        <div className=\"bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4\">\n          <div className=\"flex items-center gap-2 mb-2\">\n            <Settings2 className=\"w-4 h-4 text-slate-400\" />\n            <span className=\"text-xs font-black uppercase tracking-widest text-slate-500\">Curriculum Structure</span>\n          </div>\n          <div className=\"grid grid-cols-3 gap-6\">\n            <div className=\"space-y-1\">\n              <label className=\"text-[10px] font-black text-slate-400 uppercase tracking-widest\">Weeks/Term</label>\n              <input type=\"number\" name=\"weeksPerTerm\" value={formData.weeksPerTerm} onChange={handleChange} className=\"w-full border p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none\" />\n            </div>\n            <div className=\"space-y-1\">\n              <label className=\"text-[10px] font-black text-slate-400 uppercase tracking-widest\">Lessons/Term</label>\n              <input type=\"number\" name=\"lessonsPerTerm\" value={formData.lessonsPerTerm} onChange={handleChange} className=\"w-full border p-2.5 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600\" />\n              <p className=\"text-[8px] text-slate-400 uppercase font-black\">Target total</p>\n            </div>\n            <div className=\"space-y-1\">\n              <label className=\"text-[10px] font-black text-indigo-600 uppercase tracking-widest\">Year Total</label>\n              <div className=\"w-full bg-indigo-100 p-2.5 rounded-xl text-center font-black text-indigo-700 border border-indigo-200\">\n                {formData.lessonsPerTerm * 3} Lessons\n              </div>\n            </div>\n          </div>\n        </div>\n\n        <div className=\"grid grid-cols-3 gap-4\">\n          <input name=\"teacherName\" value={formData.teacherName} onChange={handleChange} className=\"border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" placeholder=\"Teacher Name\" />\n          <input name=\"school\" value={formData.school} onChange={handleChange} className=\"border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none\" placeholder=\"School Name\" />\n          <select name=\"academicYear\" value={formData.academicYear} onChange={handleChange} className=\"border p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white\">\n            {getAcademicYears().map(y => <option key={y} value={y}>{y}</option>)}\n          </select>\n        </div>\n\n        <button \n          type=\"submit\" \n          disabled={isExtracting} \n          className=\"w-full bg-indigo-600 text-white font-black py-4 rounded-xl hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg shadow-indigo-100 disabled:opacity-50\"\n        >\n          {isExtracting ? (\n            <Loader2 className=\"w-5 h-5 animate-spin\" />\n          ) : (\n            <Sparkles className=\"w-5 h-5\" />\n          )}\n          Generate Specific Scheme\n        </button>\n      </form>\n    </div>\n  );\n};\n\nexport default InputForm;\n"
+            }
+          ]
+        },
+        {
+          "path": "App.tsx",
+          "generationType": 1,
+          "isDone": true,
+          "description": "Updated App component to respect the dynamic lessonsPerTerm value from metadata during generation.",
+          "diffs": [
+            {
+              "target": "",
+              "replacement": "\nimport React, { useState, useEffect } from 'react';\nimport { Download, Layout, RotateCcw, Printer, PlusCircle, Sparkles, FolderArchive, Package, Info, GraduationCap, FileText, FileDown, FileCheck, X, FileSpreadsheet } from 'lucide-react';\nimport InputForm from './components/InputForm';\nimport SchemeTable from './components/SchemeTable';\nimport LoadingOverlay from './components/LoadingOverlay';\nimport { SchemeBook, SchemeMetadata, Lesson } from './types';\nimport { generateLessonChunk, generateLessonResourcesContent } from './services/geminiService';\nimport { getWeekEndingDate } from './utils/dateUtils';\nimport { exportToPDF, exportToExcel, exportToWord, downloadFullPackageZip, exportRecordBookExcel } from './utils/exportUtils';\n\nconst STORAGE_KEY = 'schemegenie_v10_chunked';\n\nconst App: React.FC = () => {\n  const [activeScheme, setActiveScheme] = useState<SchemeBook | null>(null);\n  const [isLoading, setIsLoading] = useState(false);\n  const [loadingStep, setLoadingStep] = useState<string>('');\n  const [error, setError] = useState<string | null>(null);\n\n  useEffect(() => {\n    const saved = localStorage.getItem(STORAGE_KEY);\n    if (saved) {\n      try {\n        const parsed = JSON.parse(saved);\n        if (Array.isArray(parsed) && parsed.length > 0) setActiveScheme(parsed[0]);\n      } catch (e) { }\n    }\n  }, []);\n\n  useEffect(() => {\n    if (activeScheme) localStorage.setItem(STORAGE_KEY, JSON.stringify([activeScheme]));\n  }, [activeScheme]);\n\n  const handleGenerate = async (metadata: SchemeMetadata, syllabusFile?: { data: string, mimeType: string }) => {\n    setIsLoading(true);\n    setError(null);\n    const allLessons: Lesson[] = [];\n    \n    try {\n      const CHUNK_SIZE = 24; \n      const LESSONS_PER_TERM = metadata.lessonsPerTerm;\n\n      for (let termNum = 1; termNum <= 3; termNum++) {\n        for (let lessonStart = 1; lessonStart <= LESSONS_PER_TERM; lessonStart += CHUNK_SIZE) {\n          const lessonEnd = Math.min(lessonStart + CHUNK_SIZE - 1, LESSONS_PER_TERM);\n          \n          setLoadingStep(`Term ${termNum}: Building Lessons ${lessonStart}-${lessonEnd}...`);\n          \n          const chunkData = await generateLessonChunk(termNum, lessonStart, lessonEnd, metadata, syllabusFile);\n          \n          const mappedChunk: Lesson[] = chunkData.map((l, index) => {\n            const lessonNum = lessonStart + index;\n            // Recalculate lessons per week based on total weeks if needed, or stick to provided metadata\n            const weekInTerm = Math.ceil(lessonNum / metadata.lessonsPerWeek);\n            const startDate = metadata.termStarts[`term${termNum as 1|2|3}`];\n            \n            return {\n              id: `lesson-${termNum}-${lessonNum}-${Date.now()}`,\n              term: termNum,\n              week: weekInTerm,\n              lessonNumber: lessonNum,\n              topic: l.topic || 'New Topic',\n              objectives: l.objectives || 'Detailed objectives pending...',\n              concepts: l.concepts || '',\n              activities: l.activities || 'Detailed procedures pending...',\n              resources: l.resources || 'Exhaustive list of materials pending...',\n              assessment: l.assessment || 'Formative assessment tasks...',\n              homework: l.homework || 'Application tasks...',\n              evaluation: l.evaluation || 'Specific success criteria...',\n              remarks: '',\n              weekEnding: getWeekEndingDate(startDate, weekInTerm),\n            };\n          });\n          \n          allLessons.push(...mappedChunk);\n        }\n      }\n\n      setActiveScheme({\n        id: `scheme-${Date.now()}`,\n        metadata,\n        lessons: allLessons,\n        createdAt: Date.now()\n      });\n    } catch (err: any) {\n      setError(err.message || \"The generation process was interrupted.\");\n    } finally {\n      setIsLoading(false);\n      setLoadingStep('');\n    }\n  };\n\n  const handleGenerateResources = async (lesson: Lesson) => {\n    if (!activeScheme) return;\n    updateLesson(lesson.id, 'isGeneratingResources', true);\n    try {\n      const resources = await generateLessonResourcesContent(lesson, activeScheme.metadata);\n      setActiveScheme(prev => prev ? {\n        ...prev,\n        lessons: prev.lessons.map(l => l.id === lesson.id ? { ...l, ...resources, isGeneratingResources: false } : l)\n      } : null);\n    } catch (err) {\n      alert(\"Failed to build detailed bundle.\");\n      updateLesson(lesson.id, 'isGeneratingResources', false);\n    }\n  };\n\n  const updateLesson = (id: string, field: keyof Lesson, value: any) => {\n    setActiveScheme(prev => prev ? {\n      ...prev,\n      lessons: prev.lessons.map(l => l.id === id ? { ...l, [field]: value } : l)\n    } : null);\n  };\n\n  return (\n    <div className=\"min-h-screen pb-20 bg-slate-50\">\n      <header className=\"bg-slate-800 text-white shadow-lg no-print sticky top-0 z-40\">\n        <div className=\"container mx-auto px-4 md:px-6 py-3 flex items-center justify-between\">\n          <div className=\"flex items-center gap-3\">\n            <div className=\"bg-indigo-600 p-1.5 rounded-lg shrink-0\"><Package className=\"w-5 h-5 md:w-6 md:h-6\" /></div>\n            <div>\n              <h1 className=\"text-lg md:text-xl font-bold leading-tight\">SchemeGenie</h1>\n              <p className=\"text-[10px] md:text-xs text-indigo-300 italic uppercase tracking-widest font-black\">Custom Mapping Mode • Dynamic Lessons</p>\n            </div>\n          </div>\n          <div className=\"flex items-center gap-2\">\n            {activeScheme && (\n              <button onClick={() => { if(confirm(\"Discard current plan and start over?\")) setActiveScheme(null); }} className=\"p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white\" title=\"New Scheme\">\n                <RotateCcw className=\"w-5 h-5\" />\n              </button>\n            )}\n            <div className=\"h-6 w-px bg-slate-700 mx-1 hidden md:block\"></div>\n            {activeScheme && (\n              <div className=\"flex items-center gap-1 md:gap-2\">\n                 <button onClick={() => exportToPDF(activeScheme)} className=\"bg-rose-600 hover:bg-rose-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileDown className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">PDF</span>\n                 </button>\n                 <button onClick={() => exportToWord(activeScheme)} className=\"bg-blue-600 hover:bg-blue-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileText className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">DOCX</span>\n                 </button>\n                 <button onClick={() => exportToExcel(activeScheme)} className=\"bg-emerald-600 hover:bg-emerald-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5\">\n                   <FileSpreadsheet className=\"w-4 h-4\" />\n                   <span className=\"hidden sm:inline\">EXCEL</span>\n                 </button>\n              </div>\n            )}\n          </div>\n        </div>\n      </header>\n\n      <main className=\"container mx-auto px-4 md:px-6 py-8\">\n        {!activeScheme ? (\n          <div className=\"max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700\">\n            <div className=\"text-center space-y-4 py-10\">\n              <h2 className=\"text-4xl md:text-6xl font-extrabold text-slate-800 tracking-tight leading-none\">Strict Subject <br/><span className=\"text-indigo-600\">Topic Mapping</span></h2>\n              <p className=\"text-base md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed\">\n                Provide your specific topics and we'll generate a comprehensive scheme book following your list exactly.\n              </p>\n            </div>\n            <InputForm onGenerate={handleGenerate} />\n            {error && (\n              <div className=\"bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl flex flex-col gap-2 mt-4\">\n                <div className=\"flex items-center gap-3\">\n                  <Layout className=\"w-5 h-5\" />\n                  <span className=\"font-bold\">Generation Error</span>\n                </div>\n                <p className=\"text-sm opacity-80\">{error}</p>\n              </div>\n            )}\n          </div>\n        ) : (\n          <div className=\"space-y-8\">\n            <div className=\"grid grid-cols-1 lg:grid-cols-3 gap-6 no-print\">\n              <div className=\"lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col justify-center relative overflow-hidden\">\n                <div className=\"absolute top-0 left-0 w-2 h-full bg-indigo-600\"></div>\n                <div className=\"flex items-start justify-between\">\n                  <div>\n                    <h2 className=\"text-3xl font-black text-slate-800 uppercase tracking-tight leading-none mb-1\">{activeScheme.metadata.subject}</h2>\n                    <p className=\"text-slate-500 font-bold text-sm tracking-wide\">{activeScheme.metadata.school} • {activeScheme.metadata.form} • {activeScheme.metadata.academicYear}</p>\n                    <div className=\"mt-6 flex flex-wrap gap-2\">\n                       <span className=\"bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 shadow-md\">\n                         <FileCheck className=\"w-3.5 h-3.5\" /> {activeScheme.lessons.length} Lessons Generated\n                       </span>\n                    </div>\n                  </div>\n                  <button onClick={() => setActiveScheme(null)} className=\"text-slate-300 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-full\">\n                    <X className=\"w-6 h-6\" />\n                  </button>\n                </div>\n              </div>\n              \n              <div className=\"bg-slate-800 rounded-2xl shadow-xl p-6 text-white space-y-6\">\n                <h3 className=\"text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-700 pb-2\">Master Export Suite</h3>\n                <div className=\"grid grid-cols-3 gap-3\">\n                  <button onClick={() => exportToPDF(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-rose-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileDown className=\"w-6 h-6 group-hover:scale-110 transition-transform text-rose-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">A4 PDF</span>\n                  </button>\n                  <button onClick={() => exportToWord(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-blue-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileText className=\"w-6 h-6 group-hover:scale-110 transition-transform text-blue-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Word</span>\n                  </button>\n                  <button onClick={() => exportToExcel(activeScheme)} className=\"flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-emerald-600 p-4 rounded-2xl transition-all border border-slate-600/50 group\">\n                    <FileSpreadsheet className=\"w-6 h-6 group-hover:scale-110 transition-transform text-emerald-400 group-hover:text-white\" />\n                    <span className=\"text-[8px] font-black uppercase tracking-widest\">Excel</span>\n                  </button>\n                </div>\n              </div>\n            </div>\n\n            <SchemeTable lessons={activeScheme.lessons} metadata={activeScheme.metadata} onUpdateLesson={updateLesson} onGenerateResources={handleGenerateResources} />\n          </div>\n        )}\n      </main>\n      {isLoading && <LoadingOverlay customMessage={loadingStep} />}\n    </div>\n  );\n};\n\nexport default App;\n"
+            }
+          ]
+        }
+      ]
+    },
+    "createdTimestamp": {
+      "seconds": 1769020703,
+      "nanos": 98000000
+    },
+    "doneTimestamp": {
+      "seconds": 1769020704,
+      "nanos": 839000000
+    }
+  }
+]

@@ -18,6 +18,7 @@ export interface Lesson {
   worksheetContent?: string;
   slidesContent?: string[];
   videoGuideDescription?: string;
+  videoResources?: { title: string; url: string }[];
   isGeneratingResources?: boolean;
 }
 
@@ -26,9 +27,11 @@ export interface SchemeMetadata {
   form: string;
   weeksPerTerm: number;
   lessonsPerWeek: number;
+  lessonsPerTerm: number; // User-defined target per term
   teacherName: string;
   school: string;
   academicYear: string;
+  manualTopics?: string;
   termStarts: {
     term1: string;
     term2: string;

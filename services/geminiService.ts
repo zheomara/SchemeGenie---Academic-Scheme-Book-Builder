@@ -1,11 +1,12 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { SchemeMetadata, Lesson } from "../types";
 
 export interface ExtractedSyllabusInfo {
   subject: string;
   form: string;
   recommendedWeeksPerTerm: number;
+  recommendedLessonsPerWeek: number;
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -24,8 +25,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
       const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('429') || err.status === 429;
       
       if (isQuotaError && i < maxRetries - 1) {
-        // Wait longer on each retry (30s, 60s...)
-        const waitTime = (i + 1) * 30000;
+        const waitTime = (i + 1) * 5000; // Reduced wait time for faster recovery
         console.warn(`Quota exceeded. Retrying in ${waitTime/1000}s... (Attempt ${i + 1}/${maxRetries})`);
         await sleep(waitTime);
         continue;
@@ -36,13 +36,10 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   throw lastError;
 }
 
-/**
- * Helper to get the AI instance.
- */
 const getAI = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn("API_KEY is missing. Ensure it is set in your Vercel Environment Variables.");
+    console.warn("GEMINI_API_KEY is missing.");
   }
   return new GoogleGenAI({ apiKey: apiKey || "" });
 };
@@ -56,11 +53,12 @@ export const extractSyllabusInfo = async (
       model: "gemini-3-flash-preview",
       contents: {
         parts: [
-          { text: "Analyze this syllabus. Identify the subject, target form/grade, and recommended weeks per term (usually 10-13) for a 3-term academic year." },
+          { text: "Analyze this syllabus. Identify the subject, target form/grade, recommended weeks per term (usually 10-13), and recommended lessons per week (usually 4-8) for a 3-term academic year." },
           { inlineData: syllabusFile }
         ]
       },
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -68,8 +66,9 @@ export const extractSyllabusInfo = async (
             subject: { type: Type.STRING },
             form: { type: Type.STRING },
             recommendedWeeksPerTerm: { type: Type.INTEGER },
+            recommendedLessonsPerWeek: { type: Type.INTEGER },
           },
-          required: ["subject", "form", "recommendedWeeksPerTerm"],
+          required: ["subject", "form", "recommendedWeeksPerTerm", "recommendedLessonsPerWeek"],
         }
       }
     });
@@ -78,7 +77,7 @@ export const extractSyllabusInfo = async (
       const text = response.text ?? "";
       return JSON.parse(text.trim());
     } catch (error) {
-      return { subject: "", form: "", recommendedWeeksPerTerm: 12 };
+      return { subject: "", form: "", recommendedWeeksPerTerm: 12, recommendedLessonsPerWeek: 6 };
     }
   });
 };
@@ -93,26 +92,34 @@ export const generateLessonChunk = async (
   return withRetry(async () => {
     const ai = getAI();
     
+    // Strictness logic for manual topics
+    const sourceConstraint = syllabusFile 
+      ? "STRICTLY follow the content provided in the attached syllabus PDF." 
+      : `STRICTLY ADHERE ONLY to the topics provided in this list: "${metadata.manualTopics}". DO NOT introduce any topics outside of this list. If there are fewer topics than requested lessons, break the provided topics down into highly detailed sub-topics or practical sessions, but DO NOT add unrelated subject matter.`;
+
     const textPrompt = `
-      Act as a Senior Curriculum Specialist. You are creating a specific batch of lessons for a detailed Scheme of Work.
+      Act as a Senior Curriculum Specialist. You are creating a batch of lessons for a Scheme of Work.
+      
+      CONTEXT: ${sourceConstraint}
       
       TARGET: TERM ${term}, LESSONS ${startLesson} TO ${endLesson}.
-      
+      TOTAL LESSONS FOR THIS TERM: ${metadata.lessonsPerTerm}.
+
       CRITICAL QUALITY MANDATE:
-      1. EXTREME DETAIL: Every field must be exhaustive. No generic placeholders.
-      2. RESOURCES: List specific textbooks (incl. page ranges), exact laboratory equipment (quantities and types), specific digital links (YouTube, Simulations), and detailed visual aids.
-      3. EVALUATION CRITERIA: Must be highly specific success indicators. What EXACTLY must the pupil do to show mastery? Use measurable verbs.
-      4. OBJECTIVES: "Pupils will be able to..." followed by at least 3 high-level Bloom's taxonomy objectives.
-      5. ACTIVITIES: Step-by-step classroom procedure including introduction, core activity, and plenary.
+      1. EXTREME DETAIL: Every field must be exhaustive. 
+      2. RESOURCES: List specific textbooks, laboratory equipment, digital links, and visual aids.
+      3. EVALUATION CRITERIA: Highly specific success indicators with measurable verbs.
+      4. OBJECTIVES: "Pupils will be able to..." followed by at least 3 objectives.
+      5. ACTIVITIES: Step-by-step procedure.
 
       Metadata:
       - Subject: ${metadata.subject}
       - Level: Form ${metadata.form}
-      - Term: ${term}
 
       Output format:
       Return an array of objects for lessons ${startLesson} through ${endLesson}.
-      Each object: { "term": ${term}, "week": number, "lessonNumber": number, "topic": string, "objectives": string, "activities": string, "resources": string, "assessment": string, "homework": string, "evaluation": string }
+      Each object: { "term": ${term}, "week": number, "lessonNumber": number, "topic": string, "objectives": string, "activities": string, "resources": string, "assessment": string, "homework": string, "evaluation": string, "videoResources": [{ "title": string, "url": string }] }
+      For "videoResources", provide 1-2 relevant educational video links (e.g., YouTube, Khan Academy) that explain the topic.
     `;
 
     const contents = syllabusFile 
@@ -123,7 +130,8 @@ export const generateLessonChunk = async (
       model: "gemini-3-flash-preview",
       contents: contents,
       config: {
-        thinkingConfig: { thinkingBudget: 4000 },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -140,8 +148,19 @@ export const generateLessonChunk = async (
               assessment: { type: Type.STRING },
               homework: { type: Type.STRING },
               evaluation: { type: Type.STRING },
+              videoResources: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    url: { type: Type.STRING },
+                  },
+                  required: ["title", "url"],
+                }
+              }
             },
-            required: ["term", "week", "lessonNumber", "topic", "objectives", "activities", "resources", "assessment", "homework", "evaluation"],
+            required: ["term", "week", "lessonNumber", "topic", "objectives", "activities", "resources", "assessment", "homework", "evaluation", "videoResources"],
           }
         }
       }
@@ -154,7 +173,7 @@ export const generateLessonChunk = async (
       return result;
     } catch (error) {
       console.error(`Batch ${startLesson}-${endLesson} failed:`, error);
-      throw new Error(`Failed to generate lessons ${startLesson}-${endLesson}. API limit or timeout.`);
+      throw new Error(`Failed to generate lessons ${startLesson}-${endLesson}.`);
     }
   });
 };
@@ -166,7 +185,7 @@ export const generateLessonResourcesContent = async (
   return withRetry(async () => {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Generate a hyper-detailed teaching package for Topic: "${lesson.topic}". 
       Reference existing resources: "${lesson.resources}".
       Evaluation criteria to hit: "${lesson.evaluation}".
@@ -176,9 +195,12 @@ export const generateLessonResourcesContent = async (
       2. A 15-question comprehensive Worksheet.
       3. 7 Content-rich Presentation Slides.
       4. A Video Script.
+      5. 2-3 relevant educational video links (YouTube, etc.) explaining the topic.
       
       Use "Pupils" throughout.`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -187,8 +209,19 @@ export const generateLessonResourcesContent = async (
             worksheetContent: { type: Type.STRING },
             slidesContent: { type: Type.ARRAY, items: { type: Type.STRING } },
             videoGuideDescription: { type: Type.STRING },
+            videoResources: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  url: { type: Type.STRING },
+                },
+                required: ["title", "url"],
+              }
+            }
           },
-          required: ["lessonPlanContent", "worksheetContent", "slidesContent", "videoGuideDescription"],
+          required: ["lessonPlanContent", "worksheetContent", "slidesContent", "videoGuideDescription", "videoResources"],
         }
       }
     });

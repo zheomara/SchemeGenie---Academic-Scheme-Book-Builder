@@ -33,18 +33,23 @@ export const exportToPDF = (scheme: SchemeBook) => {
     doc.setFontSize(8);
     doc.text(`${scheme.metadata.school} | Form: ${scheme.metadata.form} | Year: ${scheme.metadata.academicYear}`, 14, 20);
     
-    const body = termLessons.map(l => [
-      l.week, 
-      l.lessonNumber,
-      l.weekEnding, 
-      l.topic, 
-      l.objectives, 
-      l.activities, 
-      l.resources,
-      l.assessment,
-      l.evaluation,
-      "" // Remarks column
-    ]);
+    const body = termLessons.map(l => {
+      const videoLinks = l.videoResources?.map(v => `${v.title}: ${v.url}`).join('\n') || "";
+      const resourcesWithVideos = l.resources + (videoLinks ? `\n\nVIDEOS:\n${videoLinks}` : "");
+      
+      return [
+        l.week, 
+        l.lessonNumber,
+        "", // Blank for teacher to fill
+        l.topic, 
+        l.objectives, 
+        l.activities, 
+        resourcesWithVideos,
+        l.assessment,
+        l.evaluation,
+        "" // Remarks column
+      ];
+    });
 
     autoTable(doc, {
       startY: 25,
@@ -114,20 +119,25 @@ export const exportToWord = async (scheme: SchemeBook) => {
       ) 
     });
 
-    const rows = termLessons.map(l => new TableRow({
-      children: [
-        new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, children: createCellContent(l.week.toString(), 14) }),
-        new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, children: createCellContent(l.lessonNumber.toString(), 14) }),
-        new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent(l.weekEnding, 14) }),
-        new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.topic, 14, true) }),
-        new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: createCellContent(l.objectives, 14) }),
-        new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: createCellContent(l.activities, 14) }),
-        new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.resources, 14) }),
-        new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent(l.assessment, 14) }),
-        new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.evaluation, 14) }),
-        new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent("", 14) })
-      ]
-    }));
+    const rows = termLessons.map(l => {
+      const videoLinks = l.videoResources?.map(v => `${v.title}: ${v.url}`).join('\n') || "";
+      const resourcesWithVideos = l.resources + (videoLinks ? `\n\nVIDEOS:\n${videoLinks}` : "");
+      
+      return new TableRow({
+        children: [
+          new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, children: createCellContent(l.week.toString(), 14) }),
+          new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, children: createCellContent(l.lessonNumber.toString(), 14) }),
+          new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent("", 14) }), // Blank for teacher to fill
+          new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.topic, 14, true) }),
+          new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: createCellContent(l.objectives, 14) }),
+          new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: createCellContent(l.activities, 14) }),
+          new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(resourcesWithVideos, 14) }),
+          new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent(l.assessment, 14) }),
+          new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.evaluation, 14) }),
+          new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent("", 14) })
+        ]
+      });
+    });
 
     children.push(new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
@@ -167,11 +177,11 @@ export const exportToExcel = (scheme: SchemeBook) => {
     "Term": l.term,
     "Week": l.week,
     "Lesson #": l.lessonNumber,
-    "Date": l.weekEnding,
+    "Date": "", // Blank for teacher to fill
     "Topic": l.topic,
     "Objectives": l.objectives,
     "Activities": l.activities,
-    "Resources": l.resources,
+    "Resources": l.resources + (l.videoResources?.length ? `\n\nVIDEOS:\n${l.videoResources.map(v => `${v.title}: ${v.url}`).join('\n')}` : ""),
     "Assessment": l.assessment,
     "Evaluation Criteria": l.evaluation,
     "Remarks": l.remarks
@@ -189,6 +199,10 @@ export const downloadLessonResourcesZip = async (lesson: Lesson, metadata: Schem
   folder?.file("worksheet.txt", lesson.worksheetContent || "");
   if (lesson.slidesContent) {
     folder?.file("slides.txt", lesson.slidesContent.join('\n\n'));
+  }
+  if (lesson.videoResources && lesson.videoResources.length > 0) {
+    const videoText = lesson.videoResources.map(v => `${v.title}: ${v.url}`).join('\n');
+    folder?.file("videos.txt", videoText);
   }
   const blob = await zip.generateAsync({ type: "blob" });
   const link = document.createElement("a");

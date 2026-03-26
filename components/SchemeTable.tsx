@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Lesson, SchemeMetadata } from '../types';
-import { PackageOpen, Loader2, ChevronRight, Hash, CalendarDays, BookOpen } from 'lucide-react';
+import { PackageOpen, Loader2, ChevronRight, Hash, CalendarDays, BookOpen, Video, ExternalLink } from 'lucide-react';
 import { downloadLessonResourcesZip } from '../utils/exportUtils';
 
 interface SchemeTableProps {
@@ -100,9 +100,8 @@ const SchemeTable: React.FC<SchemeTableProps> = ({ lessons, metadata, onUpdateLe
                         <tr key={lesson.id} className="hover:bg-indigo-50/30 transition-colors align-top">
                           <td className="px-2 py-3 text-center font-black text-slate-400 text-xs">{lesson.week}</td>
                           <td className="px-2 py-3 text-center font-bold text-indigo-600 text-xs">{lesson.lessonNumber}</td>
-                          <td className="px-2 py-3 text-[10px] text-slate-500 font-medium leading-tight">
-                            <span className="block text-slate-400 text-[8px] font-bold uppercase mb-0.5">Fri</span>
-                            {lesson.weekEnding}
+                          <td className="px-2 py-3 text-[10px] text-slate-500 font-medium leading-tight border-b border-slate-200">
+                            {/* Blank for teacher to fill */}
                           </td>
                           <td className="px-2 py-3 text-[11px] font-black text-slate-800 leading-snug break-words">
                             {lesson.topic}
@@ -114,7 +113,28 @@ const SchemeTable: React.FC<SchemeTableProps> = ({ lessons, metadata, onUpdateLe
                             {lesson.activities}
                           </td>
                           <td className="px-2 py-3 text-[10px] text-slate-700 leading-relaxed font-medium bg-slate-50/50 break-words whitespace-pre-wrap">
-                            {lesson.resources}
+                            <div className="space-y-2">
+                              <div>{lesson.resources}</div>
+                              {lesson.videoResources && lesson.videoResources.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-slate-200 space-y-1">
+                                  <p className="text-[8px] font-black uppercase text-indigo-600 flex items-center gap-1">
+                                    <Video className="w-2.5 h-2.5" /> Video Resources
+                                  </p>
+                                  {lesson.videoResources.map((video, idx) => (
+                                    <a 
+                                      key={idx} 
+                                      href={video.url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline decoration-blue-300"
+                                    >
+                                      <ExternalLink className="w-2 h-2 shrink-0" />
+                                      <span className="truncate max-w-[150px]">{video.title}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="px-2 py-3 text-[10px] text-slate-500 leading-tight break-words">
                             {lesson.assessment}

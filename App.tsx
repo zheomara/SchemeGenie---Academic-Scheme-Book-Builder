@@ -6,7 +6,6 @@ import SchemeTable from './components/SchemeTable';
 import LoadingOverlay from './components/LoadingOverlay';
 import { SchemeBook, SchemeMetadata, Lesson } from './types';
 import { generateLessonChunk, generateLessonResourcesContent } from './services/geminiService';
-import { getWeekEndingDate } from './utils/dateUtils';
 import { exportToPDF, exportToExcel, exportToWord, downloadFullPackageZip, exportRecordBookExcel } from './utils/exportUtils';
 
 const STORAGE_KEY = 'schemegenie_v10_chunked';
@@ -37,43 +36,54 @@ const App: React.FC = () => {
     const allLessons: Lesson[] = [];
     
     try {
-      const CHUNK_SIZE = 24; // Increased from 12 to 24 to reduce API call count
-      const LESSONS_PER_TERM = 72;
+      const CHUNK_SIZE = 24; 
+      const LESSONS_PER_TERM = metadata.lessonsPerTerm;
+      const chunkPromises: Promise<Lesson[]>[] = [];
 
       for (let termNum = 1; termNum <= 3; termNum++) {
         for (let lessonStart = 1; lessonStart <= LESSONS_PER_TERM; lessonStart += CHUNK_SIZE) {
           const lessonEnd = Math.min(lessonStart + CHUNK_SIZE - 1, LESSONS_PER_TERM);
           
-          setLoadingStep(`Term ${termNum}: Building Lessons ${lessonStart}-${lessonEnd}...`);
-          
-          const chunkData = await generateLessonChunk(termNum, lessonStart, lessonEnd, metadata, syllabusFile);
-          
-          const mappedChunk: Lesson[] = chunkData.map((l, index) => {
-            const lessonNum = lessonStart + index;
-            const weekInTerm = Math.ceil(lessonNum / metadata.lessonsPerWeek);
-            const startDate = metadata.termStarts[`term${termNum as 1|2|3}`];
+          const fetchChunk = async () => {
+            const chunkData = await generateLessonChunk(termNum, lessonStart, lessonEnd, metadata, syllabusFile);
             
-            return {
-              id: `lesson-${termNum}-${lessonNum}-${Date.now()}`,
-              term: termNum,
-              week: weekInTerm,
-              lessonNumber: lessonNum,
-              topic: l.topic || 'New Topic',
-              objectives: l.objectives || 'Detailed objectives pending...',
-              concepts: l.concepts || '',
-              activities: l.activities || 'Detailed procedures pending...',
-              resources: l.resources || 'Exhaustive list of materials pending...',
-              assessment: l.assessment || 'Formative assessment tasks...',
-              homework: l.homework || 'Application tasks...',
-              evaluation: l.evaluation || 'Specific success criteria...',
-              remarks: '',
-              weekEnding: getWeekEndingDate(startDate, weekInTerm),
-            };
-          });
-          
-          allLessons.push(...mappedChunk);
+            return chunkData.map((l, index) => {
+              const lessonNum = lessonStart + index;
+              const weekInTerm = Math.ceil(lessonNum / metadata.lessonsPerWeek);
+              
+              return {
+                id: `lesson-${termNum}-${lessonNum}-${Date.now()}-${Math.random()}`,
+                term: termNum,
+                week: weekInTerm,
+                lessonNumber: lessonNum,
+                topic: l.topic || 'New Topic',
+                objectives: l.objectives || 'Detailed objectives pending...',
+                concepts: l.concepts || '',
+                activities: l.activities || 'Detailed procedures pending...',
+                resources: l.resources || 'Exhaustive list of materials pending...',
+                assessment: l.assessment || 'Formative assessment tasks...',
+                homework: l.homework || 'Application tasks...',
+                evaluation: l.evaluation || 'Specific success criteria...',
+                videoResources: l.videoResources || [],
+                remarks: '',
+                weekEnding: '', // Blank for teacher to fill
+              };
+            });
+          };
+
+          chunkPromises.push(fetchChunk());
         }
       }
+
+      setLoadingStep("Generating all terms in parallel...");
+      const results = await Promise.all(chunkPromises);
+      results.forEach(chunk => allLessons.push(...chunk));
+
+      // Sort lessons to ensure they are in order after parallel generation
+      allLessons.sort((a, b) => {
+        if (a.term !== b.term) return a.term - b.term;
+        return a.lessonNumber - b.lessonNumber;
+      });
 
       setActiveScheme({
         id: `scheme-${Date.now()}`,
@@ -82,7 +92,7 @@ const App: React.FC = () => {
         createdAt: Date.now()
       });
     } catch (err: any) {
-      setError(err.message || "The generation process was interrupted. Please check your internet or try again in a few minutes.");
+      setError(err.message || "The generation process was interrupted.");
     } finally {
       setIsLoading(false);
       setLoadingStep('');
@@ -99,7 +109,7 @@ const App: React.FC = () => {
         lessons: prev.lessons.map(l => l.id === lesson.id ? { ...l, ...resources, isGeneratingResources: false } : l)
       } : null);
     } catch (err) {
-      alert("Failed to build detailed bundle. You might have hit the daily API quota.");
+      alert("Failed to build detailed bundle.");
       updateLesson(lesson.id, 'isGeneratingResources', false);
     }
   };
@@ -119,7 +129,7 @@ const App: React.FC = () => {
             <div className="bg-indigo-600 p-1.5 rounded-lg shrink-0"><Package className="w-5 h-5 md:w-6 md:h-6" /></div>
             <div>
               <h1 className="text-lg md:text-xl font-bold leading-tight">SchemeGenie</h1>
-              <p className="text-[10px] md:text-xs text-indigo-300 italic uppercase tracking-widest font-black">High Fidelity Batch Mapping • 216 Lessons</p>
+              <p className="text-[10px] md:text-xs text-indigo-300 italic uppercase tracking-widest font-black">Custom Mapping Mode • Dynamic Lessons</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -143,6 +153,10 @@ const App: React.FC = () => {
                    <FileSpreadsheet className="w-4 h-4" />
                    <span className="hidden sm:inline">EXCEL</span>
                  </button>
+                 <button onClick={() => exportRecordBookExcel(activeScheme)} className="bg-indigo-600 hover:bg-indigo-500 text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5">
+                   <FileCheck className="w-4 h-4" />
+                   <span className="hidden sm:inline">RECORD</span>
+                 </button>
               </div>
             )}
           </div>
@@ -153,9 +167,9 @@ const App: React.FC = () => {
         {!activeScheme ? (
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="text-center space-y-4 py-10">
-              <h2 className="text-4xl md:text-6xl font-extrabold text-slate-800 tracking-tight leading-none">Complete Year <br/><span className="text-indigo-600">Deep-Syllabus Mapping</span></h2>
+              <h2 className="text-4xl md:text-6xl font-extrabold text-slate-800 tracking-tight leading-none">Strict Subject <br/><span className="text-indigo-600">Topic Mapping</span></h2>
               <p className="text-base md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed">
-                Generating 216 lessons optimized for API efficiency. Each lesson is detailed with specific resources and evaluation criteria.
+                Provide your specific topics and we'll generate a comprehensive scheme book following your list exactly.
               </p>
             </div>
             <InputForm onGenerate={handleGenerate} />
@@ -180,10 +194,7 @@ const App: React.FC = () => {
                     <p className="text-slate-500 font-bold text-sm tracking-wide">{activeScheme.metadata.school} • {activeScheme.metadata.form} • {activeScheme.metadata.academicYear}</p>
                     <div className="mt-6 flex flex-wrap gap-2">
                        <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 shadow-md">
-                         <FileCheck className="w-3.5 h-3.5" /> {activeScheme.lessons.length} Lessons Verified
-                       </span>
-                       <span className="bg-slate-100 text-slate-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">
-                         Full Academic Year Target Reached
+                         <FileCheck className="w-3.5 h-3.5" /> {activeScheme.lessons.length} Lessons Generated
                        </span>
                     </div>
                   </div>
@@ -195,7 +206,7 @@ const App: React.FC = () => {
               
               <div className="bg-slate-800 rounded-2xl shadow-xl p-6 text-white space-y-6">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-700 pb-2">Master Export Suite</h3>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => exportToPDF(activeScheme)} className="flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-rose-600 p-4 rounded-2xl transition-all border border-slate-600/50 group">
                     <FileDown className="w-6 h-6 group-hover:scale-110 transition-transform text-rose-400 group-hover:text-white" />
                     <span className="text-[8px] font-black uppercase tracking-widest">A4 PDF</span>
@@ -209,12 +220,8 @@ const App: React.FC = () => {
                     <span className="text-[8px] font-black uppercase tracking-widest">Excel</span>
                   </button>
                   <button onClick={() => exportRecordBookExcel(activeScheme)} className="flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-indigo-600 p-4 rounded-2xl transition-all border border-slate-600/50 group">
-                    <GraduationCap className="w-6 h-6 group-hover:scale-110 transition-transform text-indigo-400 group-hover:text-white" />
-                    <span className="text-[8px] font-black uppercase tracking-widest">Grades</span>
-                  </button>
-                  <button onClick={() => downloadFullPackageZip(activeScheme)} className="flex flex-col items-center justify-center gap-3 bg-slate-700/50 hover:bg-slate-600 p-4 rounded-2xl transition-all border border-slate-600/50 group">
-                    <FolderArchive className="w-6 h-6 group-hover:scale-110 transition-transform text-slate-400 group-hover:text-white" />
-                    <span className="text-[8px] font-black uppercase tracking-widest">Zip</span>
+                    <FileCheck className="w-6 h-6 group-hover:scale-110 transition-transform text-indigo-400 group-hover:text-white" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-center">Record Book</span>
                   </button>
                 </div>
               </div>
