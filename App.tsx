@@ -4,19 +4,25 @@ import { Download, Layout, RotateCcw, Printer, PlusCircle, Sparkles, FolderArchi
 import InputForm from './components/InputForm';
 import SchemeTable from './components/SchemeTable';
 import LoadingOverlay from './components/LoadingOverlay';
+import Login from './components/Login';
 import { SchemeBook, SchemeMetadata, Lesson } from './types';
 import { generateLessonChunk, generateLessonResourcesContent } from './services/geminiService';
 import { exportToPDF, exportToExcel, exportToWord, downloadFullPackageZip, exportRecordBookExcel } from './utils/exportUtils';
 
 const STORAGE_KEY = 'schemegenie_v10_chunked';
+const AUTH_KEY = 'schemegenie_auth_v1';
 
 const App: React.FC = () => {
   const [activeScheme, setActiveScheme] = useState<SchemeBook | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   useEffect(() => {
+    const auth = localStorage.getItem(AUTH_KEY);
+    if (auth === 'true') setIsAuthenticated(true);
+
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -119,6 +125,15 @@ const App: React.FC = () => {
       lessons: prev.lessons.map(l => l.id === id ? { ...l, [field]: value } : l)
     } : null);
   };
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    localStorage.setItem(AUTH_KEY, 'true');
+  };
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   return (
     <div className="min-h-screen pb-20 bg-slate-50">
