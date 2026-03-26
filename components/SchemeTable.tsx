@@ -113,28 +113,7 @@ const SchemeTable: React.FC<SchemeTableProps> = ({ lessons, metadata, onUpdateLe
                             {lesson.activities}
                           </td>
                           <td className="px-2 py-3 text-[10px] text-slate-700 leading-relaxed font-medium bg-slate-50/50 break-words whitespace-pre-wrap">
-                            <div className="space-y-2">
-                              <div>{lesson.resources}</div>
-                              {lesson.videoResources && lesson.videoResources.length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-slate-200 space-y-1">
-                                  <p className="text-[8px] font-black uppercase text-indigo-600 flex items-center gap-1">
-                                    <Video className="w-2.5 h-2.5" /> Video Resources
-                                  </p>
-                                  {lesson.videoResources.map((video, idx) => (
-                                    <a 
-                                      key={idx} 
-                                      href={video.url} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline decoration-blue-300"
-                                    >
-                                      <ExternalLink className="w-2 h-2 shrink-0" />
-                                      <span className="truncate max-w-[150px]">{video.title}</span>
-                                    </a>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
+                            {lesson.resources}
                           </td>
                           <td className="px-2 py-3 text-[10px] text-slate-500 leading-tight break-words">
                             {lesson.assessment}

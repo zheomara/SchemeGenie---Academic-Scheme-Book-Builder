@@ -17,8 +17,6 @@ export interface Lesson {
   lessonPlanContent?: string;
   worksheetContent?: string;
   slidesContent?: string[];
-  videoGuideDescription?: string;
-  videoResources?: { title: string; url: string }[];
   isGeneratingResources?: boolean;
 }
 

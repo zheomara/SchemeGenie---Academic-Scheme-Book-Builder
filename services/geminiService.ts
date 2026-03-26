@@ -118,8 +118,7 @@ export const generateLessonChunk = async (
 
       Output format:
       Return an array of objects for lessons ${startLesson} through ${endLesson}.
-      Each object: { "term": ${term}, "week": number, "lessonNumber": number, "topic": string, "objectives": string, "activities": string, "resources": string, "assessment": string, "homework": string, "evaluation": string, "videoResources": [{ "title": string, "url": string }] }
-      For "videoResources", provide 1-2 relevant educational video links (e.g., YouTube, Khan Academy) that explain the topic.
+      Each object: { "term": ${term}, "week": number, "lessonNumber": number, "topic": string, "objectives": string, "activities": string, "resources": string, "assessment": string, "homework": string, "evaluation": string }
     `;
 
     const contents = syllabusFile 
@@ -148,19 +147,8 @@ export const generateLessonChunk = async (
               assessment: { type: Type.STRING },
               homework: { type: Type.STRING },
               evaluation: { type: Type.STRING },
-              videoResources: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    title: { type: Type.STRING },
-                    url: { type: Type.STRING },
-                  },
-                  required: ["title", "url"],
-                }
-              }
             },
-            required: ["term", "week", "lessonNumber", "topic", "objectives", "activities", "resources", "assessment", "homework", "evaluation", "videoResources"],
+            required: ["term", "week", "lessonNumber", "topic", "objectives", "activities", "resources", "assessment", "homework", "evaluation"],
           }
         }
       }
@@ -181,7 +169,7 @@ export const generateLessonChunk = async (
 export const generateLessonResourcesContent = async (
   lesson: Lesson,
   metadata: SchemeMetadata
-): Promise<Pick<Lesson, 'lessonPlanContent' | 'worksheetContent' | 'slidesContent' | 'videoGuideDescription'>> => {
+): Promise<Pick<Lesson, 'lessonPlanContent' | 'worksheetContent' | 'slidesContent'>> => {
   return withRetry(async () => {
     const ai = getAI();
     const response = await ai.models.generateContent({
@@ -194,8 +182,6 @@ export const generateLessonResourcesContent = async (
       1. A 600-word Lesson Plan.
       2. A 15-question comprehensive Worksheet.
       3. 7 Content-rich Presentation Slides.
-      4. A Video Script.
-      5. 2-3 relevant educational video links (YouTube, etc.) explaining the topic.
       
       Use "Pupils" throughout.`,
       config: {
@@ -208,20 +194,8 @@ export const generateLessonResourcesContent = async (
             lessonPlanContent: { type: Type.STRING },
             worksheetContent: { type: Type.STRING },
             slidesContent: { type: Type.ARRAY, items: { type: Type.STRING } },
-            videoGuideDescription: { type: Type.STRING },
-            videoResources: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  url: { type: Type.STRING },
-                },
-                required: ["title", "url"],
-              }
-            }
           },
-          required: ["lessonPlanContent", "worksheetContent", "slidesContent", "videoGuideDescription", "videoResources"],
+          required: ["lessonPlanContent", "worksheetContent", "slidesContent"],
         }
       }
     });

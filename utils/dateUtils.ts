@@ -25,8 +25,9 @@ export const getAcademicYears = () => {
   const currentYear = new Date().getFullYear();
   return [
     currentYear.toString(),
+    (currentYear + 1).toString(),
+    (currentYear - 1).toString(),
     `${currentYear}/${currentYear + 1}`,
-    `${currentYear - 1}/${currentYear}`,
-    `${currentYear + 1}/${currentYear + 2}`
+    `${currentYear - 1}/${currentYear}`
   ];
 };

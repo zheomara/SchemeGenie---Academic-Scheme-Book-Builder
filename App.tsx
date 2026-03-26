@@ -64,7 +64,6 @@ const App: React.FC = () => {
                 assessment: l.assessment || 'Formative assessment tasks...',
                 homework: l.homework || 'Application tasks...',
                 evaluation: l.evaluation || 'Specific success criteria...',
-                videoResources: l.videoResources || [],
                 remarks: '',
                 weekEnding: '', // Blank for teacher to fill
               };
