@@ -15,6 +15,9 @@ const sanitizeText = (text: any): string => {
 
 const createCellContent = (text: string, size: number, isBold: boolean = false) => {
   const sanitized = sanitizeText(text);
+  if (!sanitized) {
+    return [new Paragraph({})];
+  }
   const runs = sanitized.split(/\r?\n/).map((line, idx) => new TextRun({ text: line, size, bold: isBold, break: idx > 0 ? 1 : undefined }));
   return [new Paragraph({ children: runs })];
 };
@@ -35,7 +38,7 @@ export const exportToPDF = (scheme: SchemeBook) => {
     
     const body = termLessons.map(l => {
       return [
-        l.week, 
+        "", // Blank week column
         l.lessonNumber,
         "", // Blank for teacher to fill
         l.topic, 
@@ -50,7 +53,7 @@ export const exportToPDF = (scheme: SchemeBook) => {
 
     autoTable(doc, {
       startY: 25,
-      head: [['Wk', 'L#', 'Date', 'Topic', 'Learning Objectives', 'Activities', 'Resources', 'Asmt', 'Eval Criteria', 'Remarks']],
+      head: [['Week', 'Lesson', 'Date', 'Topic', 'Learning Objectives', 'Activities', 'Resources', 'Assessment', 'Evaluation Criteria', 'Remarks']],
       body: body,
       theme: 'grid',
       styles: { 
@@ -66,16 +69,16 @@ export const exportToPDF = (scheme: SchemeBook) => {
         fontStyle: 'bold'
       },
       columnStyles: {
-        0: { cellWidth: 7 },  // Wk
-        1: { cellWidth: 7 },  // L#
+        0: { cellWidth: 10 }, // Week
+        1: { cellWidth: 10 }, // Lesson
         2: { cellWidth: 18 }, // Date
-        3: { cellWidth: 32 }, // Topic
-        4: { cellWidth: 42 }, // Objectives
-        5: { cellWidth: 42 }, // Activities
-        6: { cellWidth: 28 }, // Resources
-        7: { cellWidth: 20 }, // Assmt
-        8: { cellWidth: 32 }, // Eval Criteria
-        9: { cellWidth: 22 }  // Remarks
+        3: { cellWidth: 30 }, // Topic
+        4: { cellWidth: 40 }, // Objectives
+        5: { cellWidth: 40 }, // Activities
+        6: { cellWidth: 25 }, // Resources
+        7: { cellWidth: 22 }, // Assessment
+        8: { cellWidth: 30 }, // Eval Criteria
+        9: { cellWidth: 50 }  // Remarks (Wider)
       },
       margin: { top: 25, right: 8, bottom: 8, left: 8 }
     });
@@ -104,8 +107,10 @@ export const exportToWord = async (scheme: SchemeBook) => {
 
     children.push(new Paragraph({ text: `TERM ${termNum}`, heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }));
     
+    const columnWidths = [800, 800, 1200, 1800, 2200, 2200, 1600, 1400, 1600, 2400];
+
     const headerRow = new TableRow({ 
-      children: ['Wk', 'L#', 'Date', 'Topic', 'Learning Objectives', 'Activities', 'Res', 'Asmt', 'Eval', 'Rem'].map(h => 
+      children: ['Week', 'Lesson', 'Date', 'Topic', 'Learning Objectives', 'Activities', 'Resources', 'Assessment', 'Evaluation', 'Remarks'].map(h => 
         new TableCell({ 
           shading: { fill: "334155" },
           children: [new Paragraph({ 
@@ -119,28 +124,31 @@ export const exportToWord = async (scheme: SchemeBook) => {
     const rows = termLessons.map(l => {
       return new TableRow({
         children: [
-          new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, children: createCellContent(l.week.toString(), 14) }),
-          new TableCell({ width: { size: 4, type: WidthType.PERCENTAGE }, children: createCellContent(l.lessonNumber.toString(), 14) }),
-          new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent("", 14) }), // Blank for teacher to fill
-          new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.topic, 14, true) }),
-          new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: createCellContent(l.objectives, 14) }),
-          new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: createCellContent(l.activities, 14) }),
-          new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.resources, 14) }),
-          new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent(l.assessment, 14) }),
-          new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: createCellContent(l.evaluation, 14) }),
-          new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: createCellContent("", 14) })
+          new TableCell({ children: createCellContent("", 14) }), // Blank week column
+          new TableCell({ children: createCellContent(l.lessonNumber?.toString() || "", 14) }),
+          new TableCell({ children: createCellContent("", 14) }), // Blank for teacher to fill
+          new TableCell({ children: createCellContent(l.topic, 14, true) }),
+          new TableCell({ children: createCellContent(l.objectives, 14) }),
+          new TableCell({ children: createCellContent(l.activities, 14) }),
+          new TableCell({ children: createCellContent(l.resources, 14) }),
+          new TableCell({ children: createCellContent(l.assessment, 14) }),
+          new TableCell({ children: createCellContent(l.evaluation, 14) }),
+          new TableCell({ children: createCellContent("", 14) })
         ]
       });
     });
 
     children.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      columnWidths: columnWidths,
+      width: { size: 16000, type: WidthType.DXA },
       rows: [headerRow, ...rows],
       borders: {
-        top: { style: BorderStyle.SINGLE, size: 1 },
-        bottom: { style: BorderStyle.SINGLE, size: 1 },
-        left: { style: BorderStyle.SINGLE, size: 1 },
-        right: { style: BorderStyle.SINGLE, size: 1 },
+        top: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        left: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        right: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        insideVertical: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
       }
     }));
   });
@@ -162,18 +170,21 @@ export const exportToWord = async (scheme: SchemeBook) => {
   const blob = await Packer.toBlob(doc);
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `${scheme.metadata.subject}_Scheme_${scheme.metadata.academicYear.replace('/', '-')}.docx`;
+  
+  const safeSubject = sanitizeText(scheme.metadata.subject).replace(/[^a-zA-Z0-9 -]/g, "");
+  const safeYear = sanitizeText(scheme.metadata.academicYear).replace(/[^a-zA-Z0-9 -]/g, "");
+  link.download = `${safeSubject}_Scheme_${safeYear}.docx`;
   link.click();
 };
 
 export const exportToExcel = (scheme: SchemeBook) => {
   const data = scheme.lessons.map(l => ({
     "Term": l.term,
-    "Week": l.week,
-    "Lesson #": l.lessonNumber,
+    "Week": "", // Blank week column
+    "Lesson": l.lessonNumber,
     "Date": "", // Blank for teacher to fill
     "Topic": l.topic,
-    "Objectives": l.objectives,
+    "Learning Objectives": l.objectives,
     "Activities": l.activities,
     "Resources": l.resources,
     "Assessment": l.assessment,
@@ -204,8 +215,8 @@ export const downloadLessonResourcesZip = async (lesson: Lesson, metadata: Schem
 export const exportRecordBookExcel = (scheme: SchemeBook) => {
   const data = scheme.lessons.map(l => ({
     "Term": l.term,
-    "Week": l.week,
-    "L#": l.lessonNumber,
+    "Week": "", // Blank week column
+    "Lesson": l.lessonNumber,
     "Topic": l.topic,
     "Student Name": "",
     "Mark /10": "",

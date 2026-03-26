@@ -17,8 +17,7 @@ const getOpenAI = () => {
   if (!apiKey) return null;
   return new OpenAI({ 
     apiKey, 
-    dangerouslyAllowBrowser: true,
-    fetch: window.fetch.bind(window)
+    dangerouslyAllowBrowser: true
   });
 };
 
