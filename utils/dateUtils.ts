@@ -24,6 +24,7 @@ export const getWeekEndingDate = (startDateStr: string, weekIndex: number): stri
 export const getAcademicYears = () => {
   const currentYear = new Date().getFullYear();
   return [
+    currentYear.toString(),
     `${currentYear}/${currentYear + 1}`,
     `${currentYear - 1}/${currentYear}`,
     `${currentYear + 1}/${currentYear + 2}`
