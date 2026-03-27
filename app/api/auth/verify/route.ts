@@ -1,22 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
   try {
     const { code } = await req.json();
+    const upperCode = code.toUpperCase();
 
     // Hardcoded master code for the user
-    if (code === "2026") {
+    if (upperCode === "2026") {
       return NextResponse.json({ success: true });
     }
 
-    // Check Vercel KV for generated codes
-    const storedCode = await kv.get(`code:${code.toUpperCase()}`);
+    const masterPin = process.env.ADMIN_MASTER_PIN || "default";
 
-    if (storedCode) {
-      // Optional: Update status to 'used' or track usage
-      // await kv.set(`code:${code.toUpperCase()}`, { ...storedCode, status: 'used', usedAt: Date.now() });
-      return NextResponse.json({ success: true });
+    // Verify stateless code (no database required)
+    if (upperCode.length === 8) {
+      const payload = upperCode.substring(0, 4);
+      const signature = upperCode.substring(4, 8);
+      
+      const expectedSignature = crypto
+        .createHmac("sha256", masterPin)
+        .update(payload)
+        .digest("hex")
+        .substring(0, 4)
+        .toUpperCase();
+        
+      if (signature === expectedSignature) {
+        return NextResponse.json({ success: true });
+      }
     }
 
     return NextResponse.json({ success: false, error: "Invalid access code" }, { status: 401 });

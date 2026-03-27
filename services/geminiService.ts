@@ -13,7 +13,7 @@ export interface ExtractedSyllabusInfo {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const getOpenAI = () => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
   if (!apiKey) return null;
   return new OpenAI({ 
     apiKey, 
@@ -58,9 +58,9 @@ async function withRetry<T>(fn: () => Promise<T>, fallbackFn?: () => Promise<T>,
 }
 
 const getAI = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn("GEMINI_API_KEY is missing.");
+    console.warn("NEXT_PUBLIC_GEMINI_API_KEY is missing.");
   }
   return new GoogleGenAI({ apiKey: apiKey || "" });
 };
